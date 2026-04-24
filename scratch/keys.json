@@ -1,0 +1,46 @@
+﻿[
+    {
+        "name":  "anon",
+        "api_key":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhvc3Fxa2V5dHdta3NycHF5dW5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwNDk1OTMsImV4cCI6MjA5MjYyNTU5M30.nWY-4SO08tD2b8GSnFCzj9PTN3tLb43lSiOmCKDn9dQ",
+        "id":  "anon",
+        "type":  "legacy",
+        "hash":  "7Fe5zPbHnQvdXyotbZ7z2oMsGXVv3HqZWe2B1mDK-l8",
+        "prefix":  "nWY-4",
+        "description":  "Legacy anon API key"
+    },
+    {
+        "name":  "service_role",
+        "api_key":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhvc3Fxa2V5dHdta3NycHF5dW5hIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzA0OTU5MywiZXhwIjoyMDkyNjI1NTkzfQ.6-nzsaPVwb5KalI-1q98kir5Q9o8XcZV8EQskhNRnfw",
+        "id":  "service_role",
+        "type":  "legacy",
+        "hash":  "t9OyDEWON810oafh2SOlJDVJM1rYOVP60D9w4cSKiEk",
+        "prefix":  "6-nzs",
+        "description":  "Legacy service_role API key"
+    },
+    {
+        "id":  "b1d2511d-8077-490b-b78c-9dbe207b61f6",
+        "name":  "default",
+        "type":  "publishable",
+        "api_key":  "sb_publishable_IOXJErsN5v_ObhNy_58HQg_EYqFP9Ls",
+        "description":  null,
+        "secret_jwt_template":  null,
+        "hash":  "SH0awUOoDaeDfMzvKDvffbl4BzQm30ybgyeVheJjZY4",
+        "prefix":  "sb_publishable_IOXJE",
+        "inserted_at":  "2026-04-24T16:53:14.01368+00:00",
+        "updated_at":  "2026-04-24T16:53:14.01368+00:00"
+    },
+    {
+        "id":  "5f9980ae-c4c4-480f-bfb3-b16edd3014a0",
+        "name":  "default",
+        "type":  "secret",
+        "api_key":  "sb_secret_FN-zK··························",
+        "description":  null,
+        "secret_jwt_template":  {
+                                    "role":  "service_role"
+                                },
+        "hash":  "IXSk4XMH4TBrzk3a9S5SWIi1L8UZ0o-ZHv7awtC5ymw",
+        "prefix":  "sb_secret_FN-zK",
+        "inserted_at":  "2026-04-24T16:53:14.01368+00:00",
+        "updated_at":  "2026-04-24T16:53:14.01368+00:00"
+    }
+]

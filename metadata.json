@@ -1,0 +1,7 @@
+{
+  "name": "JUMAS 4.0",
+  "description": "Uma aplicação de cifras e tablaturas para músicos, com suporte a Português e Espanhol.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
