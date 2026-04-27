@@ -144,6 +144,37 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
 
           <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Language Selector at the Top */}
+              <div className="bg-bg-secondary p-4 rounded-2xl border border-border-color/50 mb-6">
+                <label className="text-xs font-bold text-text-secondary uppercase ml-1 flex items-center gap-2 mb-3">
+                  <Globe size={14} /> {t('profile.language')}
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleLanguageSwitch('pt')}
+                    className={`flex-1 py-2.5 px-3 rounded-xl border font-bold text-sm transition-all ${
+                      currentLanguage === 'pt'
+                        ? 'bg-jumas-green text-white border-jumas-green shadow-lg shadow-jumas-green/20'
+                        : 'bg-bg-primary border-border-color text-text-secondary hover:border-text-secondary/30'
+                    }`}
+                  >
+                    🇧🇷 Português
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleLanguageSwitch('es')}
+                    className={`flex-1 py-2.5 px-3 rounded-xl border font-bold text-sm transition-all ${
+                      currentLanguage === 'es'
+                        ? 'bg-jumas-green text-white border-jumas-green shadow-lg shadow-jumas-green/20'
+                        : 'bg-bg-primary border-border-color text-text-secondary hover:border-text-secondary/30'
+                    }`}
+                  >
+                    🇪🇸 Español
+                  </button>
+                </div>
+              </div>
+
               {message && (
                 <div className={`p-3 rounded-xl text-sm font-medium ${
                   message.type === 'success' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
@@ -205,36 +236,6 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
                 </div>
               </div>
 
-              {/* Language Selector */}
-              <div className="space-y-1.5 pb-4 border-b border-border-color/50 mb-4">
-                <label className="text-xs font-bold text-text-secondary uppercase ml-1 flex items-center gap-2">
-                  <Globe size={14} /> {t('profile.language')}
-                </label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleLanguageSwitch('pt')}
-                    className={`flex-1 py-2 px-3 rounded-xl border font-bold text-sm transition-all ${
-                      currentLanguage === 'pt'
-                        ? 'bg-jumas-green/10 border-jumas-green text-jumas-green'
-                        : 'bg-bg-secondary border-border-color text-text-secondary hover:border-text-secondary/30'
-                    }`}
-                  >
-                    Português
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleLanguageSwitch('es')}
-                    className={`flex-1 py-2 px-3 rounded-xl border font-bold text-sm transition-all ${
-                      currentLanguage === 'es'
-                        ? 'bg-jumas-green/10 border-jumas-green text-jumas-green'
-                        : 'bg-bg-secondary border-border-color text-text-secondary hover:border-text-secondary/30'
-                    }`}
-                  >
-                    Español
-                  </button>
-                </div>
-              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
