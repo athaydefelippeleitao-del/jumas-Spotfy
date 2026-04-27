@@ -61,6 +61,7 @@ export const Songbook: React.FC = () => {
             id: s.id.toString(), 
             songbookId: s.songbookId.toString(),
             artistId: s.artistId ? s.artistId.toString() : null,
+            artistIds: s.artistIds || [],
             isFavorite: !!s.isFavorite
           })));
         }
@@ -296,6 +297,7 @@ export const Songbook: React.FC = () => {
                 id: s.id.toString(), 
                 songbookId: s.songbookId.toString(),
                 artistId: s.artistId?.toString(),
+                artistIds: s.artistIds || [],
                 isFavorite: !!s.isFavorite
               })));
             }
@@ -361,6 +363,7 @@ export const Songbook: React.FC = () => {
             id: data.song.id.toString(),
             songbookId: data.song.songbookId.toString(),
             artistId: data.song.artistId ? data.song.artistId.toString() : null,
+            artistIds: data.song.artistIds || [],
             isFavorite: !!data.song.isFavorite,
             videoUrl: data.song.videoUrl,
             videoUrls: data.song.videoUrls || []
@@ -450,7 +453,7 @@ export const Songbook: React.FC = () => {
     const matchesSearch = s.title.toLowerCase().includes(query) || 
                           s.number.toString().includes(query) ||
                           (songbook && songbook.name.toLowerCase().includes(query)) ||
-                          (artist && artist.name.toLowerCase().includes(query));
+                          ((artist && artist.name.toLowerCase().includes(query)) || (s.artistIds && s.artistIds.some(id => artists.find(a => a.id === id)?.name.toLowerCase().includes(query))));
     
     const matchesCategory = activeCategory === 'Todos' || s.category === activeCategory;
 
@@ -1361,7 +1364,7 @@ export const Songbook: React.FC = () => {
                             <ShieldCheck size={14} className="text-blue-500 flex-shrink-0" />
                           </div>
                           <span className="block text-xs text-text-secondary truncate mt-0.5">
-                            {artists.find(a => a.id === song.artistId)?.name || t('songbook.unknownArtist')}
+                            {(song.artistIds && song.artistIds.length > 0) ? song.artistIds.map(id => artists.find(a => a.id === id)?.name).filter(Boolean).join(', ') : (artists.find(a => a.id === song.artistId)?.name || t('songbook.unknownArtist'))}
                           </span>
                         </div>
                       </button>
@@ -1447,7 +1450,7 @@ export const Songbook: React.FC = () => {
                       <div className="flex-1 min-w-0">
                         <span className="block text-sm md:text-base font-bold text-text-primary truncate">{song.title}</span>
                         <span className="block text-xs text-text-secondary truncate mt-0.5">
-                          {artists.find(a => a.id === song.artistId)?.name || t('songbook.unknownArtist')} • {song.category}
+                          {(song.artistIds && song.artistIds.length > 0) ? song.artistIds.map(id => artists.find(a => a.id === id)?.name).filter(Boolean).join(', ') : (artists.find(a => a.id === song.artistId)?.name || t('songbook.unknownArtist'))} • {song.category}
                         </span>
                       </div>
                     </button>
@@ -1579,7 +1582,7 @@ export const Songbook: React.FC = () => {
                         #{selectedSong.number}
                       </span>
                       <span className="text-[10px] md:text-xs text-text-secondary font-bold uppercase tracking-widest truncate">
-                        {artists.find(a => a.id === selectedSong.artistId)?.name || t('songbook.unknownArtist')} • {selectedSong.category}
+                        {(selectedSong.artistIds && selectedSong.artistIds.length > 0) ? selectedSong.artistIds.map(id => artists.find(a => a.id === id)?.name).filter(Boolean).join(', ') : (artists.find(a => a.id === selectedSong.artistId)?.name || t('songbook.unknownArtist'))} • {selectedSong.category}
                       </span>
                     </div>
                     <h2 className="font-bold text-base md:text-2xl text-text-primary tracking-tight truncate">{selectedSong.title}</h2>

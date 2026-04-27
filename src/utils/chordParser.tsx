@@ -1,5 +1,19 @@
 import React from 'react';
 
+const renderTextWithBold = (text: string) => {
+  if (!text) return text;
+  const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i} className="font-bold">{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith('*') && part.endsWith('*') && part.length > 2) {
+      return <strong key={i} className="font-bold">{part.slice(1, -1)}</strong>;
+    }
+    return <span key={i}>{part}</span>;
+  });
+};
+
 export const renderSongContent = (content: string, isEditor: boolean = false, onChordClick?: (chord: string) => void) => {
   if (!content) return null;
   
@@ -80,14 +94,14 @@ export const renderSongContent = (content: string, isEditor: boolean = false, on
         }
       }
       
-      return <span key={index}>{cleanLine}{newline}</span>;
+      return <span key={index}>{renderTextWithBold(cleanLine)}{newline}</span>;
     }
 
     const words = cleanLine.split(/(\s+)/); // Keep spaces
     const testWords = cleanLine.trim().split(/\s+/);
     
     if (testWords.length === 0 || cleanLine.trim() === '') {
-      return <span key={index}>{cleanLine}{newline}</span>;
+      return <span key={index}>{renderTextWithBold(cleanLine)}{newline}</span>;
     }
     
     let isChordLine = true;
@@ -129,7 +143,7 @@ export const renderSongContent = (content: string, isEditor: boolean = false, on
       );
     }
     
-    return <span key={index}>{cleanLine}{newline}</span>;
+    return <span key={index}>{renderTextWithBold(cleanLine)}{newline}</span>;
   });
 };
 

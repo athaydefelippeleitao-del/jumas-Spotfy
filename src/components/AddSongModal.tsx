@@ -20,6 +20,7 @@ interface AddSongModalProps {
     songbookId: string; 
     isFavorite?: boolean; 
     artistId?: string; 
+    artistIds?: string[];
     imageUrl?: string; 
     videoUrl?: string;
     videoUrls?: string[];
@@ -43,6 +44,7 @@ export const AddSongModal: React.FC<AddSongModalProps> = ({ isOpen, onClose, onA
   const [activeTab, setActiveTab] = useState<'principal' | 'simplified' | 'lyrics'>('principal');
   const [songbookId, setSongbookId] = useState(activeSongbookId);
   const [artistId, setArtistId] = useState('');
+  const [artistIds, setArtistIds] = useState<string[]>([]);
   const [isFavorite, setIsFavorite] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
@@ -128,6 +130,9 @@ export const AddSongModal: React.FC<AddSongModalProps> = ({ isOpen, onClose, onA
           const matchedArtist = artists.find(a => a.name.toLowerCase().includes(data.artist.toLowerCase()) || data.artist.toLowerCase().includes(a.name.toLowerCase()));
           if (matchedArtist) {
             setArtistId(matchedArtist.id);
+            if (!artistIds.includes(matchedArtist.id)) {
+              setArtistIds([...artistIds, matchedArtist.id]);
+            }
           }
         }
       }
@@ -163,6 +168,7 @@ export const AddSongModal: React.FC<AddSongModalProps> = ({ isOpen, onClose, onA
         setContentLyrics(editData.content_lyrics || '');
         setSongbookId(editData.songbookId || activeSongbookId);
         setArtistId(editData.artistId || '');
+        setArtistIds(editData.artistIds || (editData.artistId ? [editData.artistId] : []));
         setIsFavorite(editData.isFavorite || false);
         setImageUrl(editData.imageUrl || '');
         setVideoUrl('');
@@ -181,6 +187,7 @@ export const AddSongModal: React.FC<AddSongModalProps> = ({ isOpen, onClose, onA
         setContentLyrics('');
         setNewCategory('');
         setArtistId('');
+        setArtistIds([]);
         setIsFavorite(false);
         setImageUrl('');
         setVideoUrl('');
@@ -198,6 +205,18 @@ export const AddSongModal: React.FC<AddSongModalProps> = ({ isOpen, onClose, onA
 
   const handleRemoveVideoUrl = (urlToRemove: string) => {
     setVideoUrls(videoUrls.filter(url => url !== urlToRemove));
+  };
+
+  const handleAddArtist = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const id = e.target.value;
+    if (id && !artistIds.includes(id)) {
+      setArtistIds([...artistIds, id]);
+    }
+    e.target.value = '';
+  };
+
+  const handleRemoveArtist = (idToRemove: string) => {
+    setArtistIds(artistIds.filter(id => id !== idToRemove));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -219,7 +238,8 @@ export const AddSongModal: React.FC<AddSongModalProps> = ({ isOpen, onClose, onA
       content_lyrics: contentLyrics || null,
       songbookId,
       isFavorite,
-      artistId: artistId || null,
+      artistId: artistIds.length > 0 ? artistIds[0] : null,
+      artistIds: artistIds.length > 0 ? artistIds : undefined,
       imageUrl: imageUrl || null,
       videoUrl: videoUrls.length > 0 ? videoUrls[0] : null,
       videoUrls: videoUrls.length > 0 ? videoUrls : undefined
@@ -234,6 +254,7 @@ export const AddSongModal: React.FC<AddSongModalProps> = ({ isOpen, onClose, onA
     setCategory(categories[0] || '');
     setNewCategory('');
     setArtistId('');
+    setArtistIds([]);
     setIsFavorite(false);
     setImageUrl('');
     setVideoUrl('');
@@ -371,13 +392,34 @@ export const AddSongModal: React.FC<AddSongModalProps> = ({ isOpen, onClose, onA
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1.5">{t('songbook.artistOptional')}</label>
                 <select 
-                  value={artistId} 
-                  onChange={e => setArtistId(e.target.value)} 
+                  onChange={handleAddArtist} 
                   className="w-full bg-bg-secondary border border-border-color text-text-primary rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-jumas-green/50 focus:border-jumas-green transition-all appearance-none"
+                  defaultValue=""
                 >
-                  <option value="">{t('songbook.noArtistSelected')}</option>
+                  <option value="" disabled>{t('songbook.noArtistSelected') || 'Selecione um artista'}</option>
                   {artists.map((a, index) => <option key={`${a.id}-${index}`} value={a.id}>{a.name}</option>)}
                 </select>
+                
+                {artistIds.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {artistIds.map((id, index) => {
+                      const artist = artists.find(a => a.id === id);
+                      if (!artist) return null;
+                      return (
+                        <div key={index} className="flex items-center gap-2 bg-jumas-green/10 border border-jumas-green/30 text-jumas-green px-3 py-1.5 rounded-lg text-xs font-medium">
+                          <span className="max-w-[200px] truncate">{artist.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveArtist(id)}
+                            className="hover:text-red-500 transition-colors ml-1"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-3">

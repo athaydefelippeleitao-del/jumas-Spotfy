@@ -440,7 +440,7 @@ async function startServer() {
   });
 
   app.post("/api/songs", isAdmin, async (req, res) => {
-    const { title, category, number, content, content_simplified, content_lyrics, songbookId, artistId, isFavorite, imageUrl, videoUrl, videoUrls } = req.body;
+    const { title, category, number, content, content_simplified, content_lyrics, songbookId, artistId, artistIds, isFavorite, imageUrl, videoUrl, videoUrls } = req.body;
     try {
       const { data: song, error } = await supabase
         .from('songs')
@@ -453,6 +453,7 @@ async function startServer() {
           content_lyrics: content_lyrics || null, 
           songbookId, 
           artistId, 
+          artistIds: artistIds || [],
           isFavorite: !!isFavorite, 
           imageUrl: imageUrl || null, 
           videoUrl: videoUrl || null, 

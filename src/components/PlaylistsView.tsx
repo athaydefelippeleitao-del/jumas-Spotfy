@@ -172,7 +172,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({ onSelectPlaylist, 
 
   const filteredSearchSongs = songs.filter(s => 
     (s.title.toLowerCase().includes(songSearchQuery.toLowerCase()) || 
-     artists.find(a => a.id === s.artistId)?.name.toLowerCase().includes(songSearchQuery.toLowerCase())) &&
+     (artists.find(a => a.id === s.artistId)?.name.toLowerCase().includes(songSearchQuery.toLowerCase()) || (s.artistIds && s.artistIds.some(id => artists.find(a => a.id === id)?.name.toLowerCase().includes(songSearchQuery.toLowerCase()))))) &&
     !playlistSongs.find(ps => ps.id === s.id)
   ).slice(0, 10);
 
@@ -246,7 +246,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({ onSelectPlaylist, 
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-bold text-text-primary truncate">{song.title}</p>
                               <p className="text-[10px] text-text-secondary truncate">
-                                {artists.find(a => a.id === song.artistId)?.name || t('songbook.unknownArtist')}
+                                {(song.artistIds && song.artistIds.length > 0) ? song.artistIds.map(id => artists.find(a => a.id === id)?.name).filter(Boolean).join(', ') : (artists.find(a => a.id === song.artistId)?.name || t('songbook.unknownArtist'))}
                               </p>
                             </div>
                             <Plus size={14} className="text-jumas-green" />
@@ -294,7 +294,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({ onSelectPlaylist, 
                       <div className="flex-1 min-w-0">
                         <h3 className="font-bold text-text-primary truncate">{song.title}</h3>
                         <p className="text-xs text-text-secondary truncate">
-                          {artists.find(a => a.id === song.artistId)?.name || t('songbook.unknownArtist')}
+                          {(song.artistIds && song.artistIds.length > 0) ? song.artistIds.map(id => artists.find(a => a.id === id)?.name).filter(Boolean).join(', ') : (artists.find(a => a.id === song.artistId)?.name || t('songbook.unknownArtist'))}
                         </p>
                       </div>
                       {!isSpecial && (
@@ -391,7 +391,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({ onSelectPlaylist, 
                             <div className="min-w-0">
                               <p className="text-sm font-bold text-text-primary truncate leading-tight">{song.title}</p>
                               <p className="text-[10px] text-text-secondary truncate">
-                                {artists.find(a => a.id === song.artistId)?.name || t('songbook.unknownArtist')}
+                                {(song.artistIds && song.artistIds.length > 0) ? song.artistIds.map(id => artists.find(a => a.id === id)?.name).filter(Boolean).join(', ') : (artists.find(a => a.id === song.artistId)?.name || t('songbook.unknownArtist'))}
                               </p>
                             </div>
                           </button>
@@ -441,7 +441,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({ onSelectPlaylist, 
                           <div className="min-w-0">
                             <p className="text-sm font-bold text-text-primary truncate leading-tight">{song.title}</p>
                             <p className="text-[10px] text-text-secondary truncate">
-                              {artists.find(a => a.id === song.artistId)?.name || t('songbook.unknownArtist')}
+                              {(song.artistIds && song.artistIds.length > 0) ? song.artistIds.map(id => artists.find(a => a.id === id)?.name).filter(Boolean).join(', ') : (artists.find(a => a.id === song.artistId)?.name || t('songbook.unknownArtist'))}
                             </p>
                           </div>
                         </button>
