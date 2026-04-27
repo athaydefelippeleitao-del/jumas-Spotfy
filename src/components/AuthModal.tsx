@@ -13,7 +13,7 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, isFullScreen }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -116,6 +116,32 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, isFullScr
             className="relative w-full max-w-md bg-bg-primary/80 backdrop-blur-xl rounded-[2rem] shadow-2xl border border-white/10 flex flex-col overflow-hidden z-20"
           >
             <div className="p-8 flex flex-col items-center gap-6 relative">
+              {/* Language Toggle in Auth */}
+              <div className="absolute top-8 right-8 flex items-center bg-white/5 backdrop-blur-md rounded-xl p-1 border border-white/10">
+                <button
+                  type="button"
+                  onClick={() => i18n.changeLanguage('pt')}
+                  className={`w-7 h-7 flex items-center justify-center rounded-lg text-[10px] font-bold transition-all ${
+                    i18n.language.startsWith('pt')
+                      ? 'bg-jumas-green text-white shadow-sm'
+                      : 'text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  PT
+                </button>
+                <button
+                  type="button"
+                  onClick={() => i18n.changeLanguage('es')}
+                  className={`w-7 h-7 flex items-center justify-center rounded-lg text-[10px] font-bold transition-all ${
+                    i18n.language.startsWith('es')
+                      ? 'bg-jumas-green text-white shadow-sm'
+                      : 'text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  ES
+                </button>
+              </div>
+
               {!isLogin && (
                 <button 
                   type="button"
