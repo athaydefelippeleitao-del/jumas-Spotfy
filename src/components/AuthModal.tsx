@@ -122,7 +122,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, isFullScr
                   type="button"
                   onClick={() => i18n.changeLanguage('pt')}
                   className={`w-7 h-7 flex items-center justify-center rounded-lg text-[10px] font-bold transition-all ${
-                    i18n.language.startsWith('pt')
+                    (i18n.language || 'es').startsWith('pt')
                       ? 'bg-jumas-green text-white shadow-sm'
                       : 'text-text-secondary hover:text-text-primary'
                   }`}
@@ -133,7 +133,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, isFullScr
                   type="button"
                   onClick={() => i18n.changeLanguage('es')}
                   className={`w-7 h-7 flex items-center justify-center rounded-lg text-[10px] font-bold transition-all ${
-                    i18n.language.startsWith('es')
+                    (i18n.language || 'es').startsWith('es')
                       ? 'bg-jumas-green text-white shadow-sm'
                       : 'text-text-secondary hover:text-text-primary'
                   }`}

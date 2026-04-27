@@ -43,7 +43,7 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  const currentLanguage = i18n.language.split('-')[0];
+  const currentLanguage = (i18n.language || 'es').split('-')[0];
 
   useEffect(() => {
     if (isDark) {

@@ -47,7 +47,7 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
     }
   };
 
-  const currentLanguage = i18n.language.split('-')[0]; // Handle cases like 'pt-BR'
+  const currentLanguage = (i18n.language || 'es').split('-')[0]; // Handle cases like 'pt-BR'
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
