@@ -177,16 +177,18 @@ export const Songbook: React.FC = () => {
     let lastTime = performance.now();
     let accumulated = 0;
     let frameId: number;
+    let active = true;
 
     const tick = (now: number) => {
+      if (!active) return;
       const container = scrollContainerRef.current;
-      if (!container || !isAutoScrolling) return;
+      if (!container) return;
 
-      const delta = now - lastTime;
+      const delta = Math.min(now - lastTime, 100); // cap to avoid huge jumps
       lastTime = now;
 
-      // Speed: 20px/s to 620px/s
-      const speed = (20 + (scrollSpeed * 6)) / 1000;
+      // Speed: 5px/s (1%) to 305px/s (100%)
+      const speed = (5 + (scrollSpeed * 3)) / 1000;
       accumulated += speed * delta;
 
       if (accumulated >= 1) {
@@ -196,20 +198,21 @@ export const Songbook: React.FC = () => {
         const prevTop = container.scrollTop;
         container.scrollTop = prevTop + move;
         
-        // Auto-stop if we can't scroll further
-        const isAtBottom = Math.ceil(container.scrollTop + container.clientHeight) >= container.scrollHeight - 10;
-        if (isAtBottom || (move > 0 && container.scrollTop === prevTop)) {
-          if (isAtBottom) {
-            setIsAutoScrolling(false);
-            return;
-          }
+        // Auto-stop if we reached the bottom
+        const isAtBottom = Math.ceil(container.scrollTop + container.clientHeight) >= container.scrollHeight - 5;
+        if (isAtBottom) {
+          setIsAutoScrolling(false);
+          return;
         }
       }
       frameId = requestAnimationFrame(tick);
     };
 
     frameId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frameId);
+    return () => {
+      active = false;
+      cancelAnimationFrame(frameId);
+    };
   }, [isAutoScrolling, scrollSpeed]);
 
   useEffect(() => {
