@@ -179,10 +179,20 @@ export const Songbook: React.FC = () => {
     let frameId: number;
     let active = true;
 
+    // Find the actual scrollable element - walk up the DOM tree
+    const findScrollableElement = (): HTMLElement | null => {
+      let el = scrollContainerRef.current;
+      while (el) {
+        if (el.scrollHeight > el.clientHeight + 5) {
+          return el;
+        }
+        el = el.parentElement;
+      }
+      return null;
+    };
+
     const tick = (now: number) => {
       if (!active) return;
-      const container = scrollContainerRef.current;
-      if (!container) return;
 
       const delta = Math.min(now - lastTime, 100); // cap to avoid huge jumps
       lastTime = now;
@@ -195,14 +205,28 @@ export const Songbook: React.FC = () => {
         const move = Math.floor(accumulated);
         accumulated -= move;
         
-        const prevTop = container.scrollTop;
-        container.scrollTop = prevTop + move;
+        const scrollEl = findScrollableElement();
         
-        // Auto-stop if we reached the bottom
-        const isAtBottom = Math.ceil(container.scrollTop + container.clientHeight) >= container.scrollHeight - 5;
-        if (isAtBottom) {
-          setIsAutoScrolling(false);
-          return;
+        if (scrollEl) {
+          // Scroll the found scrollable element
+          const prevTop = scrollEl.scrollTop;
+          scrollEl.scrollTop = prevTop + move;
+          
+          const isAtBottom = Math.ceil(scrollEl.scrollTop + scrollEl.clientHeight) >= scrollEl.scrollHeight - 5;
+          if (isAtBottom) {
+            setIsAutoScrolling(false);
+            return;
+          }
+        } else {
+          // Fallback: scroll the window
+          const prevY = window.scrollY;
+          window.scrollBy(0, move);
+          
+          const isAtBottom = Math.ceil(window.scrollY + window.innerHeight) >= document.documentElement.scrollHeight - 5;
+          if (isAtBottom || window.scrollY === prevY) {
+            setIsAutoScrolling(false);
+            return;
+          }
         }
       }
       frameId = requestAnimationFrame(tick);
