@@ -76,7 +76,8 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
 
   const isOnline = (lastActive: string) => {
     if (!lastActive) return false;
-    const lastActiveDate = new Date(lastActive + 'Z'); // SQLite timestamp is UTC
+    const lastActiveDate = new Date(lastActive); // Supabase returns full ISO with timezone
+    if (isNaN(lastActiveDate.getTime())) return false;
     const now = new Date();
     const diffInMinutes = (now.getTime() - lastActiveDate.getTime()) / (1000 * 60);
     return diffInMinutes < 5;
@@ -84,7 +85,8 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
 
   const formatLastActive = (lastActive: string) => {
     if (!lastActive) return t('users.neverActive');
-    const lastActiveDate = new Date(lastActive + 'Z');
+    const lastActiveDate = new Date(lastActive); // Supabase returns full ISO with timezone
+    if (isNaN(lastActiveDate.getTime())) return t('users.neverActive');
     const now = new Date();
     const diffInMinutes = Math.floor((now.getTime() - lastActiveDate.getTime()) / (1000 * 60));
     
@@ -94,7 +96,14 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
     const diffInHours = Math.floor(diffInMinutes / 60);
     if (diffInHours < 24) return t('users.hoursAgo', { count: diffInHours });
     
-    return lastActiveDate.toLocaleDateString(i18n.language === 'es' ? 'es-ES' : 'pt-BR');
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 7) return t('users.daysAgo', { count: diffInDays }) || `há ${diffInDays} dia(s)`;
+
+    return lastActiveDate.toLocaleDateString(i18n.language === 'es' ? 'es-ES' : 'pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
   };
 
   const handleToggleRole = async () => {
