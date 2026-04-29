@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Logo } from './Logo';
-import { Moon, Sun, LogOut, Search, X, User, Globe } from 'lucide-react';
+import { Moon, Sun, LogOut, Search, X, User, Globe, BookOpen } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
@@ -14,6 +14,8 @@ interface HeaderProps {
   onOpenProfile?: () => void;
   onLogoClick?: () => void;
   showSearch?: boolean;
+  onAcademyClick?: () => void;
+  isAcademyActive?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
@@ -24,7 +26,9 @@ export const Header: React.FC<HeaderProps> = ({
   onSearchOpenChange,
   onOpenProfile,
   onLogoClick,
-  showSearch = true
+  showSearch = true,
+  onAcademyClick,
+  isAcademyActive = false,
 }) => {
   const { t, i18n } = useTranslation();
   const [isDark, setIsDark] = useState(false);
@@ -104,6 +108,20 @@ export const Header: React.FC<HeaderProps> = ({
           )}
 
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Academia link — desktop only */}
+            {onAcademyClick && (
+              <button
+                onClick={onAcademyClick}
+                className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold transition-all ${
+                  isAcademyActive
+                    ? 'bg-jumas-green/10 text-jumas-green'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-bg-secondary'
+                }`}
+              >
+                <BookOpen size={16} />
+                <span>{t('songbook.academy')}</span>
+              </button>
+            )}
             {showSearch && (
               <button
                 onClick={() => {

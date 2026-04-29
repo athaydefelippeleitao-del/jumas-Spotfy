@@ -530,6 +530,19 @@ export const Songbook: React.FC = () => {
     setIsHeaderSearchOpen(false);
   };
 
+  const goToAcademy = () => {
+    setIsAcademyActive(true);
+    setIsGlobalSearchActive(false);
+    setIsListsActive(false);
+    setIsProfileActive(false);
+    setIsPdfActive(false);
+    setIsTunerActive(false);
+    setActiveSongbookId(null);
+    setSelectedSongId(null);
+    setSelectedArtistProfileId(null);
+    setSearchQuery('');
+  };
+
   const BottomNav = () => (
     <div className="md:hidden fixed bottom-0 left-0 right-0 bg-bg-primary border-t border-border-color px-2 py-2 flex items-center justify-around z-50 transition-transform duration-300 translate-y-0">
       <button 
@@ -773,6 +786,8 @@ export const Songbook: React.FC = () => {
           }}
           onLogoClick={resetToHome}
           showSearch={false}
+          onAcademyClick={goToAcademy}
+          isAcademyActive={isAcademyActive}
         />
         <div className="flex-1 flex flex-col overflow-hidden">
           <PlaylistsView 
@@ -845,6 +860,8 @@ export const Songbook: React.FC = () => {
           }}
           onLogoClick={resetToHome}
           showSearch={false}
+          onAcademyClick={goToAcademy}
+          isAcademyActive={true}
         />
         <div className="flex-1 flex flex-col overflow-hidden">
           <AcademyView />
@@ -870,6 +887,8 @@ export const Songbook: React.FC = () => {
           }}
           onLogoClick={resetToHome}
           showSearch={false}
+          onAcademyClick={goToAcademy}
+          isAcademyActive={isAcademyActive}
         />
         <div className="flex-1 container mx-auto max-w-7xl p-4 md:p-6 overflow-y-auto">
           <ProfileView 
@@ -901,6 +920,8 @@ export const Songbook: React.FC = () => {
           }}
           onLogoClick={resetToHome}
           showSearch={false}
+          onAcademyClick={goToAcademy}
+          isAcademyActive={isAcademyActive}
         />
         <div className="flex-1 container mx-auto max-w-7xl p-4 md:p-6 overflow-y-auto pb-24">
           <div className="bg-bg-elevated rounded-3xl border border-border-color shadow-sm overflow-hidden min-h-[600px] flex flex-col">
@@ -949,6 +970,8 @@ export const Songbook: React.FC = () => {
           }}
           onLogoClick={resetToHome}
           showSearch={true}
+          onAcademyClick={goToAcademy}
+          isAcademyActive={isAcademyActive}
         />
         <div className="flex-1 container mx-auto max-w-7xl p-4 md:p-6 overflow-y-auto pb-32">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 md:mb-8 gap-4">
@@ -1117,6 +1140,8 @@ export const Songbook: React.FC = () => {
         }}
         onLogoClick={resetToHome}
         showSearch={true}
+        onAcademyClick={goToAcademy}
+        isAcademyActive={isAcademyActive}
       />
       <div className="flex-1 flex flex-col md:flex-row container mx-auto max-w-7xl p-0 md:p-6 gap-6 h-[calc(100dvh-64px)] overflow-hidden pb-16 md:pb-0">
         {/* Categories Sidebar (Desktop) / Header (Mobile) */}
