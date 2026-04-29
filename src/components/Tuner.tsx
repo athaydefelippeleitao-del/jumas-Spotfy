@@ -4,14 +4,9 @@ import { Mic, MicOff, Volume2, Info, AlertCircle, ChevronDown, Hash, Play } from
 import { useTranslation } from 'react-i18next';
 
 const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-const TUNING_DATA = [
-  { note: 'E2', name: 'Mi', freq: 82.41, string: 6 },
-  { note: 'A2', name: 'Lá', freq: 110.00, string: 5 },
-  { note: 'D3', name: 'Ré', freq: 146.83, string: 4 },
-  { note: 'G3', name: 'Sol', freq: 196.00, string: 3 },
-  { note: 'B3', name: 'Si', freq: 246.94, string: 2 },
-  { note: 'E4', name: 'Mi', freq: 329.63, string: 1 },
-];
+
+// Number of frames to average for smoothing (higher = less jittery but slower)
+const SMOOTH_FRAMES = 8;
 
 export const Tuner: React.FC = () => {
   const { t } = useTranslation();
@@ -27,6 +22,8 @@ export const Tuner: React.FC = () => {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  // Rolling buffer for smoothing
+  const centsHistoryRef = useRef<number[]>([]);
 
   const startListening = async () => {
     try {
@@ -42,6 +39,7 @@ export const Tuner: React.FC = () => {
       source.connect(analyser);
       analyserRef.current = analyser;
       
+      centsHistoryRef.current = [];
       setIsListening(true);
       setError(null);
       updatePitch();
@@ -67,6 +65,7 @@ export const Tuner: React.FC = () => {
     if (audioContextRef.current) {
       audioContextRef.current.close();
     }
+    centsHistoryRef.current = [];
     setIsListening(false);
     setPitch(null);
     setNote(null);
@@ -83,10 +82,17 @@ export const Tuner: React.FC = () => {
     const autoCorrelatePitch = autoCorrelate(buffer, audioContextRef.current!.sampleRate);
     
     if (autoCorrelatePitch !== -1) {
-      setPitch(autoCorrelatePitch);
       const { noteName, centsOff } = getNoteFromFrequency(autoCorrelatePitch);
+
+      // Rolling average smoothing
+      const history = centsHistoryRef.current;
+      history.push(centsOff);
+      if (history.length > SMOOTH_FRAMES) history.shift();
+      const smoothedCents = Math.round(history.reduce((a, b) => a + b, 0) / history.length);
+
+      setPitch(autoCorrelatePitch);
       setNote(noteName);
-      setCents(centsOff);
+      setCents(smoothedCents);
     }
     
     animationFrameRef.current = requestAnimationFrame(updatePitch);
@@ -110,7 +116,8 @@ export const Tuner: React.FC = () => {
       rms += buffer[i] * buffer[i];
     }
     rms = Math.sqrt(rms / size);
-    if (rms < 0.01) return -1;
+    // Raised threshold: ignore quieter sounds (less background noise sensitivity)
+    if (rms < 0.02) return -1;
 
     let r1 = 0, r2 = size - 1, thres = 0.2;
     for (let i = 0; i < size / 2; i++) {
@@ -169,10 +176,26 @@ export const Tuner: React.FC = () => {
 
   const getTunerColor = () => {
     if (!isListening || note === null) return 'text-text-secondary/50';
-    if (Math.abs(cents) < 5) return 'text-jumas-green';
-    if (Math.abs(cents) < 15) return 'text-yellow-500';
+    if (Math.abs(cents) <= 5) return 'text-jumas-green';
+    if (Math.abs(cents) <= 15) return 'text-yellow-500';
     return 'text-red-500';
   };
+
+  /** Returns instruction text: whether to tighten, loosen or it's in tune */
+  const getTuningInstruction = (): { text: string; color: string } | null => {
+    if (!isListening || note === null) return null;
+    if (Math.abs(cents) <= 5) {
+      return { text: '✓ Afinado!', color: 'text-jumas-green' };
+    }
+    if (cents < 0) {
+      // Frequency too low → tighten the string
+      return { text: '↑ Apertar a corda', color: cents < -15 ? 'text-red-500' : 'text-yellow-500' };
+    }
+    // Frequency too high → loosen the string
+    return { text: '↓ Soltar a corda', color: cents > 15 ? 'text-red-500' : 'text-yellow-500' };
+  };
+
+  const instruction = getTuningInstruction();
 
   return (
     <div className="flex flex-col h-full bg-transparent text-text-primary overflow-hidden relative font-sans">
@@ -258,8 +281,8 @@ export const Tuner: React.FC = () => {
           </div>
         </div>
 
-        {/* Bottom Section (Meter + Buttons) */}
-        <div className="w-full flex flex-col items-center gap-8 md:gap-12 relative z-20 pb-2 md:pb-6">
+        {/* Bottom Section (Meter + Instruction + Buttons) */}
+        <div className="w-full flex flex-col items-center gap-4 md:gap-6 relative z-20 pb-2 md:pb-6">
           {/* Tuning Meter */}
           <div className="w-full max-w-md h-12 relative flex items-center justify-center px-6">
             {/* Meter Scale */}
@@ -277,12 +300,30 @@ export const Tuner: React.FC = () => {
             {/* Needle */}
             {isListening && note && (
               <motion.div 
-                animate={{ x: `${(cents / 50) * 100}%` }}
-                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                className="absolute bottom-0 w-1 h-10 bg-jumas-green shadow-[0_0_15px_rgba(34,197,94,0.5)] z-20 rounded-full"
+                animate={{ x: `${Math.max(-100, Math.min(100, (cents / 50) * 100))}%` }}
+                transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+                className={`absolute bottom-0 w-1 h-10 shadow-[0_0_15px_rgba(34,197,94,0.5)] z-20 rounded-full transition-colors duration-300 ${
+                  Math.abs(cents) <= 5 ? 'bg-jumas-green' : Math.abs(cents) <= 15 ? 'bg-yellow-500' : 'bg-red-500'
+                }`}
               />
             )}
           </div>
+
+          {/* Tuning Instruction */}
+          <AnimatePresence mode="wait">
+            {instruction && (
+              <motion.div
+                key={instruction.text}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.2 }}
+                className={`text-lg font-black tracking-wide ${instruction.color}`}
+              >
+                {instruction.text}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* String Buttons */}
           <div className="flex justify-center gap-2 sm:gap-4 md:gap-6 px-2 w-full max-w-lg mx-auto">
@@ -357,4 +398,3 @@ export const Tuner: React.FC = () => {
     </div>
   );
 };
-
