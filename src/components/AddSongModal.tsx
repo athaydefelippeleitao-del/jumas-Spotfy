@@ -555,11 +555,10 @@ export const AddSongModal: React.FC<AddSongModalProps> = ({ isOpen, onClose, onA
                 {activeTab === 'lyrics' && (
                   <div className="flex-1 flex flex-col">
                     <label className="block text-sm font-medium text-text-secondary mb-1.5">{t('songbook.lyricsOptional')}</label>
-                    <textarea
+                    <ChordEditor
                       value={contentLyrics}
-                      onChange={e => setContentLyrics(e.target.value)}
+                      onChange={setContentLyrics}
                       placeholder={t('songbook.placeholderLyrics')}
-                      className="flex-1 w-full bg-bg-secondary border border-border-color text-text-primary rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-jumas-green/50 focus:border-jumas-green transition-all font-mono resize-none"
                     />
                   </div>
                 )}
