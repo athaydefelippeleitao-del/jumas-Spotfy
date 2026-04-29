@@ -739,6 +739,39 @@ async function startServer() {
     }
   });
 
+  app.delete("/api/users/:id", isAdmin, async (req: any, res: any) => {
+    const { id } = req.params;
+    const adminId = req.user.id;
+
+    if (parseInt(id) === adminId) {
+      return res.status(400).json({ error: "Você não pode excluir sua própria conta." });
+    }
+
+    try {
+      const { data: user, error: getError } = await supabase.from('users').select('username, role').eq('id', id).single();
+      if (getError || !user) return res.status(404).json({ error: "Usuário não encontrado" });
+
+      console.log(`[ADMIN ACTION] User ${req.user.username} is deleting account of user ${user.username} (id ${id})`);
+
+      // Clean up related data
+      await supabase.from('user_favorites').delete().eq('userId', id);
+      const { data: playlists } = await supabase.from('playlists').select('id').eq('userId', id);
+      if (playlists && playlists.length > 0) {
+        const playlistIds = playlists.map((p: any) => p.id);
+        await supabase.from('playlist_songs').delete().in('playlistId', playlistIds);
+        await supabase.from('playlists').delete().eq('userId', id);
+      }
+
+      const { error } = await supabase.from('users').delete().eq('id', id);
+      if (error) throw error;
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ error: "Erro ao excluir usuário" });
+    }
+  });
+
   app.patch("/api/auth/profile", async (req, res) => {
     const token = req.cookies.token;
     if (!token) return res.status(401).json({ error: "Não autenticado" });

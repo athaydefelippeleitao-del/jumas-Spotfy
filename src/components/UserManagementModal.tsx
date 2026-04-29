@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, User as UserIcon, Shield, ShieldAlert, Loader2, Edit2, Check, Mail, MapPin, Calendar, Camera, Search } from 'lucide-react';
+import { X, User as UserIcon, Shield, ShieldAlert, Loader2, Edit2, Check, Mail, MapPin, Calendar, Camera, Search, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
@@ -36,6 +36,8 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
   const [editForm, setEditForm] = useState<Partial<User>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<User | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -85,7 +87,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
 
   const formatLastActive = (lastActive: string) => {
     if (!lastActive) return t('users.neverActive');
-    const lastActiveDate = new Date(lastActive); // Supabase returns full ISO with timezone
+    const lastActiveDate = new Date(lastActive);
     if (isNaN(lastActiveDate.getTime())) return t('users.neverActive');
     const now = new Date();
     const diffInMinutes = Math.floor((now.getTime() - lastActiveDate.getTime()) / (1000 * 60));
@@ -95,15 +97,35 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
     
     const diffInHours = Math.floor(diffInMinutes / 60);
     if (diffInHours < 24) return t('users.hoursAgo', { count: diffInHours });
-    
-    const diffInDays = Math.floor(diffInHours / 24);
-    if (diffInDays < 7) return t('users.daysAgo', { count: diffInDays }) || `há ${diffInDays} dia(s)`;
 
-    return lastActiveDate.toLocaleDateString(i18n.language === 'es' ? 'es-ES' : 'pt-BR', {
+    // Show date and time for older entries
+    return lastActiveDate.toLocaleString(i18n.language === 'es' ? 'es-ES' : 'pt-BR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
     });
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deleteConfirm) return;
+    setDeletingId(deleteConfirm.id);
+    setDeleteConfirm(null);
+    try {
+      const res = await fetch(`/api/users/${deleteConfirm.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setUsers(prev => prev.filter(u => u.id !== deleteConfirm.id));
+        alert(t('users.deleteUserSuccess'));
+      } else {
+        const data = await res.json();
+        alert(data.error || t('common.deleteError'));
+      }
+    } catch {
+      alert(t('common.connError'));
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const handleToggleRole = async () => {
@@ -456,6 +478,24 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
                                     <Shield size={20} />
                                   )}
                                 </button>
+                                <button
+                                  onClick={() => {
+                                    if (user.id === currentUser?.id) {
+                                      alert(t('users.cannotDeleteSelf'));
+                                      return;
+                                    }
+                                    setDeleteConfirm(user);
+                                  }}
+                                  disabled={deletingId === user.id}
+                                  className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
+                                  title={t('users.deleteUser')}
+                                >
+                                  {deletingId === user.id ? (
+                                    <Loader2 className="animate-spin" size={20} />
+                                  ) : (
+                                    <Trash2 size={20} />
+                                  )}
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -519,6 +559,51 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
                     </button>
                     <button
                       onClick={() => setConfirmState(null)}
+                      className="w-full py-3 rounded-2xl font-bold text-sm text-text-secondary hover:bg-bg-secondary transition-all"
+                    >
+                      {t('common.cancel')}
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Delete User Confirmation Modal */}
+        <AnimatePresence>
+          {deleteConfirm && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px]"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0, y: 10 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 10 }}
+                className="w-full max-w-sm bg-bg-elevated rounded-3xl shadow-2xl p-6 border border-border-color"
+              >
+                <div className="flex flex-col items-center text-center gap-4">
+                  <div className="p-4 rounded-2xl bg-red-500/10 text-red-500">
+                    <Trash2 size={32} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-text-primary">{t('users.deleteUser')}</h3>
+                    <p className="text-sm text-text-secondary mt-1">
+                      {t('users.deleteUserConfirm', { name: deleteConfirm.name })}
+                    </p>
+                  </div>
+                  <div className="flex flex-col w-full gap-2 mt-2">
+                    <button
+                      onClick={handleDeleteUser}
+                      className="w-full py-3 rounded-2xl font-bold text-sm bg-red-500 text-white hover:bg-red-600 transition-all"
+                    >
+                      {t('common.delete')}
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirm(null)}
                       className="w-full py-3 rounded-2xl font-bold text-sm text-text-secondary hover:bg-bg-secondary transition-all"
                     >
                       {t('common.cancel')}
