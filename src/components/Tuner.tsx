@@ -1,12 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mic, MicOff, Volume2, Info, AlertCircle, ChevronDown, Hash, Play } from 'lucide-react';
+import { Mic, AlertCircle, ChevronDown, Hash } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
-// Number of frames to average for smoothing (higher = less jittery but slower)
-const SMOOTH_FRAMES = 8;
+// ── Stability settings ──────────────────────────────────────────────────────
+// Must detect the SAME note for this many consecutive frames before showing it
+const NOTE_LOCK_FRAMES = 12;
+// Exponential smoothing factor for cents (0 = frozen, 1 = instant). Lower = smoother.
+const CENTS_ALPHA = 0.12;
+// Minimum RMS volume to process (ignore background noise)
+const RMS_THRESHOLD = 0.025;
+// Only push a UI update every N frames (reduces flickering)
+const UI_UPDATE_EVERY = 3;
+// ────────────────────────────────────────────────────────────────────────────
 
 export const Tuner: React.FC = () => {
   const { t } = useTranslation();
@@ -22,81 +30,13 @@ export const Tuner: React.FC = () => {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-  // Rolling buffer for smoothing
-  const centsHistoryRef = useRef<number[]>([]);
 
-  const startListening = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      audioContextRef.current = audioContext;
-      
-      const source = audioContext.createMediaStreamSource(stream);
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 2048;
-      source.connect(analyser);
-      analyserRef.current = analyser;
-      
-      centsHistoryRef.current = [];
-      setIsListening(true);
-      setError(null);
-      updatePitch();
-    } catch (err: any) {
-      console.error('Error accessing microphone:', err);
-      if (err.name === 'NotFoundError' || err.message?.includes('Requested device not found')) {
-        setError(t('tuner.noMic'));
-      } else if (err.name === 'NotAllowedError' || err.message?.includes('Permission denied')) {
-        setError(t('tuner.micDenied'));
-      } else {
-        setError(t('tuner.micError'));
-      }
-    }
-  };
-
-  const stopListening = () => {
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-    }
-    centsHistoryRef.current = [];
-    setIsListening(false);
-    setPitch(null);
-    setNote(null);
-    setCents(0);
-  };
-
-  const updatePitch = () => {
-    if (!analyserRef.current) return;
-    
-    const bufferLength = analyserRef.current.fftSize;
-    const buffer = new Float32Array(bufferLength);
-    analyserRef.current.getFloatTimeDomainData(buffer);
-    
-    const autoCorrelatePitch = autoCorrelate(buffer, audioContextRef.current!.sampleRate);
-    
-    if (autoCorrelatePitch !== -1) {
-      const { noteName, centsOff } = getNoteFromFrequency(autoCorrelatePitch);
-
-      // Rolling average smoothing
-      const history = centsHistoryRef.current;
-      history.push(centsOff);
-      if (history.length > SMOOTH_FRAMES) history.shift();
-      const smoothedCents = Math.round(history.reduce((a, b) => a + b, 0) / history.length);
-
-      setPitch(autoCorrelatePitch);
-      setNote(noteName);
-      setCents(smoothedCents);
-    }
-    
-    animationFrameRef.current = requestAnimationFrame(updatePitch);
-  };
+  // Stability state (all in refs so they don't cause re-renders inside the loop)
+  const candidateNoteRef = useRef<string>('');
+  const candidateCountRef = useRef<number>(0);
+  const lockedNoteRef = useRef<string | null>(null);
+  const smoothedCentsRef = useRef<number>(0);
+  const frameCounterRef = useRef<number>(0);
 
   const getTuningData = () => [
     { note: 'E2', name: t('tuner.notes.Mi'), freq: 82.41, string: 6 },
@@ -109,103 +49,174 @@ export const Tuner: React.FC = () => {
 
   const TUNING_DATA = getTuningData();
 
-  const autoCorrelate = (buffer: Float32Array, sampleRate: number) => {
-    let size = buffer.length;
-    let rms = 0;
-    for (let i = 0; i < size; i++) {
-      rms += buffer[i] * buffer[i];
-    }
-    rms = Math.sqrt(rms / size);
-    // Raised threshold: ignore quieter sounds (less background noise sensitivity)
-    if (rms < 0.02) return -1;
+  // ── Audio helpers ──────────────────────────────────────────────────────────
 
-    let r1 = 0, r2 = size - 1, thres = 0.2;
+  const autoCorrelate = (buffer: Float32Array, sampleRate: number): number => {
+    const size = buffer.length;
+    let rms = 0;
+    for (let i = 0; i < size; i++) rms += buffer[i] * buffer[i];
+    rms = Math.sqrt(rms / size);
+    if (rms < RMS_THRESHOLD) return -1; // Too quiet → ignore
+
+    let r1 = 0, r2 = size - 1;
+    const thres = 0.2;
     for (let i = 0; i < size / 2; i++) {
-      if (Math.abs(buffer[i]) < thres) {
-        r1 = i;
-        break;
-      }
+      if (Math.abs(buffer[i]) < thres) { r1 = i; break; }
     }
     for (let i = 1; i < size / 2; i++) {
-      if (Math.abs(buffer[size - i]) < thres) {
-        r2 = size - i;
-        break;
-      }
+      if (Math.abs(buffer[size - i]) < thres) { r2 = size - i; break; }
     }
 
     const buf = buffer.slice(r1, r2);
-    size = buf.length;
-
-    const c = new Float32Array(size);
-    for (let i = 0; i < size; i++) {
-      for (let j = 0; j < size - i; j++) {
-        c[i] = c[i] + buf[j] * buf[j + i];
-      }
+    const len = buf.length;
+    const c = new Float32Array(len);
+    for (let i = 0; i < len; i++) {
+      for (let j = 0; j < len - i; j++) c[i] += buf[j] * buf[j + i];
     }
 
     let d = 0;
     while (c[d] > c[d + 1]) d++;
     let maxval = -1, maxpos = -1;
-    for (let i = d; i < size; i++) {
-      if (c[i] > maxval) {
-        maxval = c[i];
-        maxpos = i;
-      }
+    for (let i = d; i < len; i++) {
+      if (c[i] > maxval) { maxval = c[i]; maxpos = i; }
     }
     let T0 = maxpos;
-
     const x1 = c[T0 - 1], x2 = c[T0], x3 = c[T0 + 1];
     const a = (x1 + x3 - 2 * x2) / 2;
     const b = (x3 - x1) / 2;
     if (a) T0 = T0 - b / (2 * a);
-
     return sampleRate / T0;
   };
 
-  const getNoteFromFrequency = (frequency: number) => {
-    const noteNum = 12 * (Math.log(frequency / 440) / Math.log(2));
-    const roundedNoteNum = Math.round(noteNum) + 69;
-    const noteName = NOTES[roundedNoteNum % 12];
-    const centsOff = Math.floor(1200 * (Math.log(frequency / (440 * Math.pow(2, (roundedNoteNum - 69) / 12))) / Math.log(2)));
+  const getNoteFromFrequency = (freq: number) => {
+    const noteNum = 12 * (Math.log(freq / 440) / Math.log(2));
+    const rounded = Math.round(noteNum) + 69;
+    const noteName = NOTES[((rounded % 12) + 12) % 12];
+    const exactFreq = 440 * Math.pow(2, (rounded - 69) / 12);
+    const centsOff = Math.round(1200 * Math.log2(freq / exactFreq));
     return { noteName, centsOff };
   };
 
-  useEffect(() => {
-    return () => stopListening();
-  }, []);
+  // ── Main detection loop ────────────────────────────────────────────────────
+
+  const updatePitch = () => {
+    if (!analyserRef.current || !audioContextRef.current) return;
+
+    const buffer = new Float32Array(analyserRef.current.fftSize);
+    analyserRef.current.getFloatTimeDomainData(buffer);
+
+    const detectedFreq = autoCorrelate(buffer, audioContextRef.current.sampleRate);
+
+    if (detectedFreq !== -1) {
+      const { noteName, centsOff } = getNoteFromFrequency(detectedFreq);
+
+      // ── Note locking: only switch note after NOTE_LOCK_FRAMES confirmations ──
+      if (noteName === candidateNoteRef.current) {
+        candidateCountRef.current += 1;
+      } else {
+        candidateNoteRef.current = noteName;
+        candidateCountRef.current = 1;
+      }
+
+      if (candidateCountRef.current >= NOTE_LOCK_FRAMES) {
+        lockedNoteRef.current = noteName;
+      }
+
+      // ── Exponential smoothing on cents ──────────────────────────────────────
+      if (lockedNoteRef.current !== null) {
+        smoothedCentsRef.current =
+          CENTS_ALPHA * centsOff + (1 - CENTS_ALPHA) * smoothedCentsRef.current;
+      }
+
+      // ── Push to UI only every UI_UPDATE_EVERY frames ────────────────────────
+      frameCounterRef.current += 1;
+      if (frameCounterRef.current >= UI_UPDATE_EVERY) {
+        frameCounterRef.current = 0;
+        if (lockedNoteRef.current !== null) {
+          setNote(lockedNoteRef.current);
+          setCents(Math.round(smoothedCentsRef.current));
+          setPitch(detectedFreq);
+        }
+      }
+    }
+
+    animationFrameRef.current = requestAnimationFrame(updatePitch);
+  };
+
+  // ── Lifecycle ──────────────────────────────────────────────────────────────
+
+  const startListening = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioContextRef.current = audioContext;
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 2048;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+
+      // Reset stability state
+      candidateNoteRef.current = '';
+      candidateCountRef.current = 0;
+      lockedNoteRef.current = null;
+      smoothedCentsRef.current = 0;
+      frameCounterRef.current = 0;
+
+      setIsListening(true);
+      setError(null);
+      updatePitch();
+    } catch (err: any) {
+      if (err.name === 'NotFoundError') setError(t('tuner.noMic'));
+      else if (err.name === 'NotAllowedError') setError(t('tuner.micDenied'));
+      else setError(t('tuner.micError'));
+    }
+  };
+
+  const stopListening = () => {
+    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    audioContextRef.current?.close();
+    lockedNoteRef.current = null;
+    setIsListening(false);
+    setPitch(null);
+    setNote(null);
+    setCents(0);
+  };
+
+  useEffect(() => () => stopListening(), []);
+
+  // ── UI helpers ─────────────────────────────────────────────────────────────
 
   const getTunerColor = () => {
-    if (!isListening || note === null) return 'text-text-secondary/50';
-    if (Math.abs(cents) <= 5) return 'text-jumas-green';
+    if (!isListening || !note) return 'text-text-secondary/50';
+    if (Math.abs(cents) <= 5)  return 'text-jumas-green';
     if (Math.abs(cents) <= 15) return 'text-yellow-500';
     return 'text-red-500';
   };
 
-  /** Returns instruction text: whether to tighten, loosen or it's in tune */
   const getTuningInstruction = (): { text: string; color: string } | null => {
-    if (!isListening || note === null) return null;
-    if (Math.abs(cents) <= 5) {
-      return { text: '✓ Afinado!', color: 'text-jumas-green' };
-    }
-    if (cents < 0) {
-      // Frequency too low → tighten the string
-      return { text: '↑ Apertar a corda', color: cents < -15 ? 'text-red-500' : 'text-yellow-500' };
-    }
-    // Frequency too high → loosen the string
-    return { text: '↓ Soltar a corda', color: cents > 15 ? 'text-red-500' : 'text-yellow-500' };
+    if (!isListening || !note) return null;
+    if (Math.abs(cents) <= 5)  return { text: '✓ Afinado!',         color: 'text-jumas-green' };
+    if (cents < 0)             return { text: '↑ Apertar a corda',  color: cents < -15 ? 'text-red-500' : 'text-yellow-500' };
+    return                            { text: '↓ Soltar a corda',   color: cents > 15  ? 'text-red-500' : 'text-yellow-500' };
   };
 
   const instruction = getTuningInstruction();
 
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
     <div className="flex flex-col h-full bg-transparent text-text-primary overflow-hidden relative font-sans">
+
       {/* Top Bar */}
       <div className="flex items-center justify-between px-6 py-4 bg-bg-secondary/50 backdrop-blur-md z-20 border-b border-border-color">
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded-full transition-colors ${isListening ? 'bg-jumas-green/20 text-jumas-green' : 'bg-bg-elevated text-text-secondary'}`}>
             <Mic size={20} />
           </div>
-          <button 
+          <button
             className="flex items-center gap-2 bg-bg-elevated hover:bg-bg-secondary px-4 py-2 rounded-xl transition-all text-text-primary"
             onClick={() => !isListening ? startListening() : stopListening()}
           >
@@ -213,40 +224,33 @@ export const Tuner: React.FC = () => {
             <ChevronDown size={16} className="text-text-secondary" />
           </button>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Buttons removed */}
-        </div>
       </div>
 
-      {/* Main Content Area */}
+      {/* Main Content */}
       <div className="flex-1 relative flex flex-col items-center justify-between overflow-hidden py-6 md:py-8">
-        {/* Strings Visualization */}
+
+        {/* String lines background */}
         <div className="absolute inset-0 flex justify-center gap-6 sm:gap-8 md:gap-12 px-4 pointer-events-none">
           {TUNING_DATA.map((s, idx) => (
-            <div 
-              key={idx} 
-              className={`w-[1px] h-full bg-gradient-to-b from-border-color via-border-color/50 to-transparent relative transition-all duration-500 ${selectedString === s.string ? 'bg-jumas-green/40 w-[2px]' : ''}`}
+            <div
+              key={idx}
+              className={`w-[1px] h-full bg-gradient-to-b from-border-color via-border-color/50 to-transparent transition-all duration-500 ${selectedString === s.string ? 'opacity-100' : 'opacity-60'}`}
             >
               {selectedString === s.string && (
-                <motion.div 
-                  layoutId="string-glow"
-                  className="absolute inset-0 bg-jumas-green/20 blur-sm"
-                />
+                <motion.div layoutId="string-glow" className="absolute inset-0 bg-jumas-green/20 blur-sm" />
               )}
             </div>
           ))}
         </div>
 
-        {/* Status Text */}
+        {/* Note display */}
         <div className="flex-1 flex items-center justify-center relative z-10 w-full min-h-[150px]">
           <div className="text-center px-4">
             <AnimatePresence mode="wait">
               {error ? (
                 <motion.div
                   key="error"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
+                  initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
                   className="bg-red-500/10 text-red-500 p-4 rounded-xl max-w-sm mx-auto border border-red-500/20"
                 >
                   <p className="font-bold mb-1">{t('tuner.errorTitle')}</p>
@@ -255,23 +259,24 @@ export const Tuner: React.FC = () => {
               ) : isListening && note ? (
                 <motion.div
                   key="note"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
+                  initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
                   className="space-y-2 md:space-y-4"
                 >
-                  <div className={`text-7xl md:text-8xl font-black tracking-tighter transition-colors duration-200 ${getTunerColor()}`}>
+                  {/* Large note name — uses layout animation so it doesn't "flash" on change */}
+                  <motion.div
+                    layout
+                    className={`text-7xl md:text-8xl font-black tracking-tighter transition-colors duration-300 ${getTunerColor()}`}
+                  >
                     {note}
-                  </div>
+                  </motion.div>
                   <div className="text-xs md:text-sm font-bold text-text-secondary uppercase tracking-[0.2em]">
                     {pitch?.toFixed(1)} Hz
                   </div>
                 </motion.div>
               ) : (
-                <motion.p 
+                <motion.p
                   key="prompt"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                   className="text-base sm:text-lg md:text-xl text-text-secondary font-medium"
                 >
                   {t('tuner.prompt')}
@@ -281,49 +286,50 @@ export const Tuner: React.FC = () => {
           </div>
         </div>
 
-        {/* Bottom Section (Meter + Instruction + Buttons) */}
+        {/* Bottom: Needle + Instruction + String Buttons */}
         <div className="w-full flex flex-col items-center gap-4 md:gap-6 relative z-20 pb-2 md:pb-6">
+
           {/* Tuning Meter */}
           <div className="w-full max-w-md h-12 relative flex items-center justify-center px-6">
-            {/* Meter Scale */}
             <div className="absolute inset-0 flex justify-between items-end px-2">
               {[...Array(21)].map((_, i) => (
-                <div 
-                  key={i} 
+                <div
+                  key={i}
                   className={`w-0.5 rounded-full transition-all ${
                     i === 10 ? 'h-8 bg-text-secondary' : i % 5 === 0 ? 'h-5 bg-border-color' : 'h-3 bg-border-color/50'
-                  }`} 
+                  }`}
                 />
               ))}
             </div>
-            
-            {/* Needle */}
+
             {isListening && note && (
-              <motion.div 
+              <motion.div
                 animate={{ x: `${Math.max(-100, Math.min(100, (cents / 50) * 100))}%` }}
-                transition={{ type: 'spring', stiffness: 120, damping: 20 }}
-                className={`absolute bottom-0 w-1 h-10 shadow-[0_0_15px_rgba(34,197,94,0.5)] z-20 rounded-full transition-colors duration-300 ${
-                  Math.abs(cents) <= 5 ? 'bg-jumas-green' : Math.abs(cents) <= 15 ? 'bg-yellow-500' : 'bg-red-500'
+                transition={{ type: 'spring', stiffness: 60, damping: 18 }}
+                className={`absolute bottom-0 w-1.5 h-10 z-20 rounded-full transition-colors duration-500 shadow-lg ${
+                  Math.abs(cents) <= 5 ? 'bg-jumas-green shadow-jumas-green/40'
+                  : Math.abs(cents) <= 15 ? 'bg-yellow-500 shadow-yellow-500/40'
+                  : 'bg-red-500 shadow-red-500/40'
                 }`}
               />
             )}
           </div>
 
-          {/* Tuning Instruction */}
-          <AnimatePresence mode="wait">
-            {instruction && (
-              <motion.div
-                key={instruction.text}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.2 }}
-                className={`text-lg font-black tracking-wide ${instruction.color}`}
-              >
-                {instruction.text}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* Tuning instruction */}
+          <div className="h-8 flex items-center justify-center">
+            <AnimatePresence mode="wait">
+              {instruction && (
+                <motion.div
+                  key={instruction.text}
+                  initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.25 }}
+                  className={`text-lg font-black tracking-wide ${instruction.color}`}
+                >
+                  {instruction.text}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
           {/* String Buttons */}
           <div className="flex justify-center gap-2 sm:gap-4 md:gap-6 px-2 w-full max-w-lg mx-auto">
@@ -338,13 +344,11 @@ export const Tuner: React.FC = () => {
                     selectedString === s.string ? 'scale-110' : 'hover:scale-105'
                   }`}
                 >
-                  {/* Teardrop Shape */}
                   <div className={`absolute inset-0 rounded-full rounded-tl-none rotate-45 border-2 transition-all duration-300 ${
-                    selectedString === s.string 
-                      ? 'bg-jumas-green/20 border-jumas-green shadow-[0_0_20px_rgba(34,197,94,0.3)]' 
+                    selectedString === s.string
+                      ? 'bg-jumas-green/20 border-jumas-green shadow-[0_0_20px_rgba(34,197,94,0.3)]'
                       : 'bg-bg-secondary border-border-color group-hover:border-text-secondary'
                   }`} />
-                  
                   <div className="relative z-10 flex flex-col items-center">
                     <span className={`text-xs sm:text-sm md:text-base font-black transition-colors ${selectedString === s.string ? 'text-jumas-green' : 'text-text-secondary'}`}>
                       {s.note[0]}<sub className="text-[9px] sm:text-[10px]">{s.note[1]}</sub>
@@ -362,14 +366,14 @@ export const Tuner: React.FC = () => {
 
       {/* Bottom Navigation */}
       <div className="bg-bg-secondary/50 border-t border-border-color px-4 py-3 flex items-center justify-around z-30">
-        <button 
+        <button
           onClick={() => setMode('chromatic')}
           className={`flex flex-col items-center gap-1 transition-all ${mode === 'chromatic' ? 'text-jumas-green' : 'text-text-secondary hover:text-text-primary'}`}
         >
           <Hash size={20} />
           <span className="text-[10px] font-bold uppercase tracking-wider">{t('tuner.chromatic')}</span>
         </button>
-        <button 
+        <button
           onClick={() => setMode('string-by-string')}
           className={`flex flex-col items-center gap-1 transition-all relative ${mode === 'string-by-string' ? 'text-jumas-green' : 'text-text-secondary hover:text-text-primary'}`}
         >
