@@ -196,11 +196,24 @@ export const Tuner: React.FC = () => {
     return 'text-red-500';
   };
 
-  const getTuningInstruction = (): { text: string; color: string } | null => {
+  const getTuningInstruction = (): { text: string; sub: string; color: string } | null => {
     if (!isListening || !note) return null;
-    if (Math.abs(cents) <= 5)  return { text: '✓ Afinado!',         color: 'text-jumas-green' };
-    if (cents < 0)             return { text: '↑ Apertar a corda',  color: cents < -15 ? 'text-red-500' : 'text-yellow-500' };
-    return                            { text: '↓ Soltar a corda',   color: cents > 15  ? 'text-red-500' : 'text-yellow-500' };
+    const absCents = Math.abs(cents);
+    if (absCents <= 5) return { text: '✓ Afinado!', sub: '', color: 'text-jumas-green' };
+
+    const intensity = absCents <= 15 ? 'um pouco' : absCents <= 30 ? 'bastante' : 'muito';
+    const centLabel = `${absCents} cents`;
+
+    if (cents < 0) return {
+      text: '↑ Apertar a corda',
+      sub: `${intensity} — ${centLabel} abaixo`,
+      color: absCents > 30 ? 'text-red-500' : absCents > 15 ? 'text-yellow-500' : 'text-yellow-400',
+    };
+    return {
+      text: '↓ Soltar a corda',
+      sub: `${intensity} — ${centLabel} acima`,
+      color: absCents > 30 ? 'text-red-500' : absCents > 15 ? 'text-yellow-500' : 'text-yellow-400',
+    };
   };
 
   const instruction = getTuningInstruction();
@@ -290,42 +303,80 @@ export const Tuner: React.FC = () => {
         <div className="w-full flex flex-col items-center gap-4 md:gap-6 relative z-20 pb-2 md:pb-6">
 
           {/* Tuning Meter */}
-          <div className="w-full max-w-md h-12 relative flex items-center justify-center px-6">
-            <div className="absolute inset-0 flex justify-between items-end px-2">
-              {[...Array(21)].map((_, i) => (
-                <div
-                  key={i}
-                  className={`w-0.5 rounded-full transition-all ${
-                    i === 10 ? 'h-8 bg-text-secondary' : i % 5 === 0 ? 'h-5 bg-border-color' : 'h-3 bg-border-color/50'
+          <div className="w-full max-w-md relative flex flex-col items-center gap-2 px-6">
+
+            {/* Tick marks + needle */}
+            <div className="w-full h-12 relative flex items-center justify-center">
+              <div className="absolute inset-0 flex justify-between items-end px-2">
+                {[...Array(21)].map((_, i) => (
+                  <div
+                    key={i}
+                    className={`w-0.5 rounded-full transition-all ${
+                      i === 10 ? 'h-8 bg-text-secondary' : i % 5 === 0 ? 'h-5 bg-border-color' : 'h-3 bg-border-color/50'
+                    }`}
+                  />
+                ))}
+              </div>
+
+              {isListening && note && (
+                <motion.div
+                  animate={{ x: `${Math.max(-100, Math.min(100, (cents / 50) * 100))}%` }}
+                  transition={{ type: 'spring', stiffness: 60, damping: 18 }}
+                  className={`absolute bottom-0 w-1.5 h-10 z-20 rounded-full transition-colors duration-500 shadow-lg ${
+                    Math.abs(cents) <= 5 ? 'bg-jumas-green shadow-jumas-green/40'
+                    : Math.abs(cents) <= 15 ? 'bg-yellow-400 shadow-yellow-400/40'
+                    : Math.abs(cents) <= 30 ? 'bg-yellow-500 shadow-yellow-500/40'
+                    : 'bg-red-500 shadow-red-500/40'
                   }`}
                 />
-              ))}
+              )}
             </div>
 
-            {isListening && note && (
-              <motion.div
-                animate={{ x: `${Math.max(-100, Math.min(100, (cents / 50) * 100))}%` }}
-                transition={{ type: 'spring', stiffness: 60, damping: 18 }}
-                className={`absolute bottom-0 w-1.5 h-10 z-20 rounded-full transition-colors duration-500 shadow-lg ${
-                  Math.abs(cents) <= 5 ? 'bg-jumas-green shadow-jumas-green/40'
-                  : Math.abs(cents) <= 15 ? 'bg-yellow-500 shadow-yellow-500/40'
-                  : 'bg-red-500 shadow-red-500/40'
-                }`}
-              />
+            {/* Fill bar showing deviation amount */}
+            {isListening && note && Math.abs(cents) > 5 && (
+              <div className="w-full h-1.5 bg-bg-elevated rounded-full overflow-hidden relative">
+                {/* center marker */}
+                <div className="absolute left-1/2 top-0 bottom-0 w-px bg-text-secondary/40" />
+                <motion.div
+                  animate={{
+                    width: `${Math.min(50, Math.abs(cents / 50) * 50)}%`,
+                    x: cents < 0 ? '-100%' : '0%',
+                    left: cents < 0 ? '50%' : '50%',
+                  }}
+                  transition={{ type: 'spring', stiffness: 80, damping: 20 }}
+                  className={`absolute top-0 h-full rounded-full ${
+                    Math.abs(cents) <= 15 ? 'bg-yellow-400'
+                    : Math.abs(cents) <= 30 ? 'bg-yellow-500'
+                    : 'bg-red-500'
+                  }`}
+                  style={{
+                    left: '50%',
+                    transform: cents < 0 ? 'translateX(-100%)' : 'translateX(0%)',
+                    width: `${Math.min(50, (Math.abs(cents) / 50) * 50)}%`,
+                  }}
+                />
+              </div>
             )}
           </div>
 
           {/* Tuning instruction */}
-          <div className="h-8 flex items-center justify-center">
+          <div className="min-h-[56px] flex flex-col items-center justify-center gap-0.5">
             <AnimatePresence mode="wait">
               {instruction && (
                 <motion.div
                   key={instruction.text}
                   initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
                   transition={{ duration: 0.25 }}
-                  className={`text-lg font-black tracking-wide ${instruction.color}`}
+                  className="flex flex-col items-center gap-0.5"
                 >
-                  {instruction.text}
+                  <span className={`text-lg font-black tracking-wide ${instruction.color}`}>
+                    {instruction.text}
+                  </span>
+                  {instruction.sub && (
+                    <span className={`text-xs font-semibold opacity-80 ${instruction.color}`}>
+                      {instruction.sub}
+                    </span>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
