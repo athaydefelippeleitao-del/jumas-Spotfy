@@ -7,13 +7,13 @@ const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
 // ── Stability settings ──────────────────────────────────────────────────────
 // Must detect the SAME note for this many consecutive frames before showing it
-const NOTE_LOCK_FRAMES = 12;
+const NOTE_LOCK_FRAMES = 18;
 // Exponential smoothing factor for cents (0 = frozen, 1 = instant). Lower = smoother.
-const CENTS_ALPHA = 0.12;
+const CENTS_ALPHA = 0.08;
 // Minimum RMS volume to process (ignore background noise)
-const RMS_THRESHOLD = 0.025;
+const RMS_THRESHOLD = 0.035;
 // Only push a UI update every N frames (reduces flickering)
-const UI_UPDATE_EVERY = 3;
+const UI_UPDATE_EVERY = 5;
 // ────────────────────────────────────────────────────────────────────────────
 
 export const Tuner: React.FC = () => {
@@ -191,29 +191,31 @@ export const Tuner: React.FC = () => {
 
   const getTunerColor = () => {
     if (!isListening || !note) return 'text-text-secondary/50';
-    if (Math.abs(cents) <= 5)  return 'text-jumas-green';
-    if (Math.abs(cents) <= 15) return 'text-yellow-500';
+    if (Math.abs(cents) <= 8)  return 'text-jumas-green';
+    if (Math.abs(cents) <= 20) return 'text-yellow-500';
     return 'text-red-500';
   };
 
   const getTuningInstruction = (): { text: string; sub: string; color: string } | null => {
     if (!isListening || !note) return null;
     const absCents = Math.abs(cents);
-    if (absCents <= 5) return { text: '✓ Afinado!', sub: '', color: 'text-jumas-green' };
+    if (absCents <= 8) return { text: '✓ Afinado!', sub: 'Perfeito', color: 'text-jumas-green' };
 
-    const intensity = absCents <= 15 ? 'um pouco' : absCents <= 30 ? 'bastante' : 'muito';
-    const centLabel = `${absCents} cents`;
+    const isTighten = cents < 0;
+    const text = isTighten ? '↑ Apertar a corda' : '↓ Soltar a corda';
+    let sub = '';
 
-    if (cents < 0) return {
-      text: '↑ Apertar a corda',
-      sub: `${intensity} — ${centLabel} abaixo`,
-      color: absCents > 30 ? 'text-red-500' : absCents > 15 ? 'text-yellow-500' : 'text-yellow-400',
-    };
-    return {
-      text: '↓ Soltar a corda',
-      sub: `${intensity} — ${centLabel} acima`,
-      color: absCents > 30 ? 'text-red-500' : absCents > 15 ? 'text-yellow-500' : 'text-yellow-400',
-    };
+    if (absCents <= 20) {
+      sub = isTighten ? 'Aperte só um pouquinho' : 'Solte só um pouquinho';
+    } else if (absCents <= 40) {
+      sub = isTighten ? 'Aperte um pouco mais' : 'Solte um pouco mais';
+    } else {
+      sub = isTighten ? 'Aperte bastante' : 'Solte bastante';
+    }
+
+    const color = absCents > 40 ? 'text-red-500' : absCents > 20 ? 'text-yellow-500' : 'text-yellow-400';
+
+    return { text, sub, color };
   };
 
   const instruction = getTuningInstruction();
@@ -323,9 +325,9 @@ export const Tuner: React.FC = () => {
                   animate={{ x: `${Math.max(-100, Math.min(100, (cents / 50) * 100))}%` }}
                   transition={{ type: 'spring', stiffness: 60, damping: 18 }}
                   className={`absolute bottom-0 w-1.5 h-10 z-20 rounded-full transition-colors duration-500 shadow-lg ${
-                    Math.abs(cents) <= 5 ? 'bg-jumas-green shadow-jumas-green/40'
-                    : Math.abs(cents) <= 15 ? 'bg-yellow-400 shadow-yellow-400/40'
-                    : Math.abs(cents) <= 30 ? 'bg-yellow-500 shadow-yellow-500/40'
+                    Math.abs(cents) <= 8 ? 'bg-jumas-green shadow-jumas-green/40'
+                    : Math.abs(cents) <= 20 ? 'bg-yellow-400 shadow-yellow-400/40'
+                    : Math.abs(cents) <= 40 ? 'bg-yellow-500 shadow-yellow-500/40'
                     : 'bg-red-500 shadow-red-500/40'
                   }`}
                 />
@@ -333,7 +335,7 @@ export const Tuner: React.FC = () => {
             </div>
 
             {/* Fill bar showing deviation amount */}
-            {isListening && note && Math.abs(cents) > 5 && (
+            {isListening && note && Math.abs(cents) > 8 && (
               <div className="w-full h-1.5 bg-bg-elevated rounded-full overflow-hidden relative">
                 {/* center marker */}
                 <div className="absolute left-1/2 top-0 bottom-0 w-px bg-text-secondary/40" />
@@ -345,8 +347,8 @@ export const Tuner: React.FC = () => {
                   }}
                   transition={{ type: 'spring', stiffness: 80, damping: 20 }}
                   className={`absolute top-0 h-full rounded-full ${
-                    Math.abs(cents) <= 15 ? 'bg-yellow-400'
-                    : Math.abs(cents) <= 30 ? 'bg-yellow-500'
+                    Math.abs(cents) <= 20 ? 'bg-yellow-400'
+                    : Math.abs(cents) <= 40 ? 'bg-yellow-500'
                     : 'bg-red-500'
                   }`}
                   style={{
