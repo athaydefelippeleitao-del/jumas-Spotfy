@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Music } from 'lucide-react';
 
 interface SongCoverProps {
@@ -9,6 +9,20 @@ interface SongCoverProps {
 }
 
 export function SongCover({ song, className = "w-12 h-12 rounded-xl", iconSize = 20 }: SongCoverProps) {
+  const [spotifyThumb, setSpotifyThumb] = useState<string | null>(null);
+
+  useEffect(() => {
+    const url = song?.videoUrl || (song?.videoUrls && song.videoUrls.length > 0 ? song.videoUrls[0] : null);
+    if (url && url.includes('spotify.com')) {
+      fetch(`https://open.spotify.com/oembed?url=${url}`)
+        .then(res => res.json())
+        .then(data => setSpotifyThumb(data.thumbnail_url))
+        .catch(() => setSpotifyThumb(null));
+    } else {
+      setSpotifyThumb(null);
+    }
+  }, [song?.videoUrl, song?.videoUrls]);
+
   const getYoutubeThumbnail = (url: string) => {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/ ;
     const match = url.match(regExp);
@@ -21,10 +35,10 @@ export function SongCover({ song, className = "w-12 h-12 rounded-xl", iconSize =
   const videoThumbnail = urlForThumb
     ? (urlForThumb.includes('youtube.com') || urlForThumb.includes('youtu.be')
         ? getYoutubeThumbnail(urlForThumb)
-        : null)
+        : spotifyThumb)
     : null;
 
-  // Only show the song's own cover — never the artist photo
+  // Prioridade: capa cadastrada > thumbnail YouTube/Spotify — sem foto do artista
   const finalImageUrl = song?.imageUrl || videoThumbnail;
 
   return (
