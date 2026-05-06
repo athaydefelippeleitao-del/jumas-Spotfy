@@ -58,7 +58,7 @@ export const renderSongContent = (content: string, isEditor: boolean = false, on
         const testWords = rest.trim().split(/\s+/);
         for (const word of testWords) {
           if (word === '') continue;
-          const isChord = /^[A-G][#b]?(m|maj|min|dim|aug|sus|add)?[0-9]*(?:\([^)]+\))?(?:\/[A-G][#b]?)?$/i.test(word);
+          const isChord = /^[A-G][#b]?(m|maj|min|dim|aug|sus|add|°)?[0-9]*M?(?:[+°])?(?:\([^)]+\))?(?:\/[A-G][#b]?)?$/.test(word);
           if (isChord) {
             chordCount++;
           } else {
@@ -74,7 +74,7 @@ export const renderSongContent = (content: string, isEditor: boolean = false, on
             <span key={index}>
               {prefix}
               {words.map((word, wIndex) => {
-                const isChord = /^[A-G][#b]?(m|maj|min|dim|aug|sus|add)?[0-9]*(?:\([^)]+\))?(?:\/[A-G][#b]?)?$/i.test(word);
+                const isChord = /^[A-G][#b]?(m|maj|min|dim|aug|sus|add|°)?[0-9]*M?(?:[+°])?(?:\([^)]+\))?(?:\/[A-G][#b]?)?$/.test(word);
                 if (isChord) {
                   return (
                     <span 
@@ -109,7 +109,7 @@ export const renderSongContent = (content: string, isEditor: boolean = false, on
     
     for (const word of testWords) {
       if (word === '') continue;
-      const isChord = /^[A-G][#b]?(m|maj|min|dim|aug|sus|add)?[0-9]*(?:\([^)]+\))?(?:\/[A-G][#b]?)?$/i.test(word);
+      const isChord = /^[A-G][#b]?(m|maj|min|dim|aug|sus|add|°)?[0-9]*M?(?:[+°])?(?:\([^)]+\))?(?:\/[A-G][#b]?)?$/.test(word);
       if (isChord) {
         chordCount++;
       } else {
@@ -124,7 +124,7 @@ export const renderSongContent = (content: string, isEditor: boolean = false, on
       return (
         <span key={index}>
           {words.map((word, wIndex) => {
-            const isChord = /^[A-G][#b]?(m|maj|min|dim|aug|sus|add)?[0-9]*(?:\([^)]+\))?(?:\/[A-G][#b]?)?$/i.test(word);
+            const isChord = /^[A-G][#b]?(m|maj|min|dim|aug|sus|add|°)?[0-9]*M?(?:[+°])?(?:\([^)]+\))?(?:\/[A-G][#b]?)?$/.test(word);
             if (isChord) {
               return (
                 <span 
@@ -177,7 +177,7 @@ export const extractChords = (content: string): string[] => {
     
     for (const word of words) {
       if (word === '') continue;
-      const isChord = /^[A-G][#b]?(m|maj|min|dim|aug|sus|add)?[0-9]*(?:\([^)]+\))?(?:\/[A-G][#b]?)?$/i.test(word);
+      const isChord = /^[A-G][#b]?(m|maj|min|dim|aug|sus|add|°)?[0-9]*M?(?:[+°])?(?:\([^)]+\))?(?:\/[A-G][#b]?)?$/.test(word);
       if (isChord) {
         lineChords.push(word);
       } else {
