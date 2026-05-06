@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Music } from 'lucide-react';
 
 interface SongCoverProps {
@@ -8,23 +8,9 @@ interface SongCoverProps {
   iconSize?: number;
 }
 
-export function SongCover({ song, artist, className = "w-12 h-12 rounded-xl", iconSize = 20 }: SongCoverProps) {
-  const [spotifyThumb, setSpotifyThumb] = useState<string | null>(null);
-
-  useEffect(() => {
-    const url = song?.videoUrl || (song?.videoUrls && song.videoUrls.length > 0 ? song.videoUrls[0] : null);
-    if (url && url.includes('spotify.com')) {
-      fetch(`https://open.spotify.com/oembed?url=${url}`)
-        .then(res => res.json())
-        .then(data => setSpotifyThumb(data.thumbnail_url))
-        .catch(() => setSpotifyThumb(null));
-    } else {
-      setSpotifyThumb(null);
-    }
-  }, [song?.videoUrl, song?.videoUrls]);
-
+export function SongCover({ song, className = "w-12 h-12 rounded-xl", iconSize = 20 }: SongCoverProps) {
   const getYoutubeThumbnail = (url: string) => {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/ ;
     const match = url.match(regExp);
     return (match && match[2].length === 11)
       ? `https://img.youtube.com/vi/${match[2]}/hqdefault.jpg`
@@ -32,13 +18,14 @@ export function SongCover({ song, artist, className = "w-12 h-12 rounded-xl", ic
   };
 
   const urlForThumb = song?.videoUrl || (song?.videoUrls && song.videoUrls.length > 0 ? song.videoUrls[0] : null);
-  const videoThumbnail = urlForThumb 
-    ? (urlForThumb.includes('youtube.com') || urlForThumb.includes('youtu.be') 
-        ? getYoutubeThumbnail(urlForThumb) 
-        : spotifyThumb)
+  const videoThumbnail = urlForThumb
+    ? (urlForThumb.includes('youtube.com') || urlForThumb.includes('youtu.be')
+        ? getYoutubeThumbnail(urlForThumb)
+        : null)
     : null;
 
-  const finalImageUrl = videoThumbnail || song?.imageUrl || artist?.photoUrl;
+  // Only show the song's own cover — never the artist photo
+  const finalImageUrl = song?.imageUrl || videoThumbnail;
 
   return (
     <div className={`${className} bg-bg-secondary overflow-hidden flex-shrink-0 border border-border-color shadow-sm relative`}>
