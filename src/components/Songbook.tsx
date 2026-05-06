@@ -35,21 +35,32 @@ export const Songbook: React.FC = () => {
   const [artists, setArtists] = useState<{id: string, name: string, photoUrl?: string, biography?: string}[]>([]);
   const [songs, setSongs] = useState<any[]>([]);
   const [playlists, setPlaylists] = useState<any[]>([]);
+  const [isLoadingSongbooks, setIsLoadingSongbooks] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
+    // Phase 1: load songbooks first so the home screen appears instantly
+    const fetchPriority = async () => {
       try {
-        const [sbRes, artRes, songRes, playRes] = await Promise.all([
-          fetch('/api/songbooks'),
-          fetch('/api/artists'),
-          fetch('/api/songs'),
-          fetch('/api/playlists')
-        ]);
-        
+        const sbRes = await fetch('/api/songbooks');
         if (sbRes.ok) {
           const data = await sbRes.json();
           setSongbooks(data.songbooks.map((sb: any) => ({ ...sb, id: sb.id.toString() })));
         }
+      } catch (error) {
+        console.error('Failed to fetch songbooks', error);
+      } finally {
+        setIsLoadingSongbooks(false);
+      }
+    };
+
+    // Phase 2: load remaining data in background (songs, artists, playlists)
+    const fetchBackground = async () => {
+      try {
+        const [artRes, songRes, playRes] = await Promise.all([
+          fetch('/api/artists'),
+          fetch('/api/songs'),
+          fetch('/api/playlists')
+        ]);
         if (artRes.ok) {
           const data = await artRes.json();
           setArtists(data.artists.map((a: any) => ({ ...a, id: a.id.toString() })));
@@ -70,10 +81,11 @@ export const Songbook: React.FC = () => {
           setPlaylists(data.playlists.map((p: any) => ({ ...p, id: p.id.toString() })));
         }
       } catch (error) {
-        console.error('Failed to fetch data', error);
+        console.error('Failed to fetch background data', error);
       }
     };
-    fetchData();
+
+    fetchPriority().then(() => fetchBackground());
   }, []);
 
   const [activeSongbookId, setActiveSongbookId] = useState<string | null>(null);
@@ -992,7 +1004,22 @@ export const Songbook: React.FC = () => {
             </div>
           </div>
 
-          {songbooks.length === 0 && (
+          {/* Skeleton loading while songbooks fetch */}
+          {isLoadingSongbooks && (
+            <div className="flex flex-col gap-2">
+              {[1,2,3,4].map(i => (
+                <div key={i} className="flex items-center gap-4 p-3 bg-bg-elevated rounded-2xl border border-border-color animate-pulse">
+                  <div className="w-14 h-14 rounded-xl bg-bg-secondary flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-bg-secondary rounded-lg w-3/5" />
+                    <div className="h-3 bg-bg-secondary rounded-lg w-2/5" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!isLoadingSongbooks && songbooks.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 md:py-20 text-center px-6">
               <div className="w-20 h-20 bg-bg-secondary rounded-full flex items-center justify-center mb-6 shadow-inner">
                 <Book size={32} className="text-text-secondary opacity-20" />
