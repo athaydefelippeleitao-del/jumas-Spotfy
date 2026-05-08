@@ -14,6 +14,40 @@ const renderTextWithBold = (text: string) => {
   });
 };
 
+// Regex to detect inline chord definition lines like:
+// "F#m:* x4420x"  or  "C#m: x-11-11-9-0-x"
+const CUSTOM_CHORD_LINE_RE = /^[A-G][#b]?[^:\s]*:\*?\s+[x0-9][0-9x-]+$/i;
+
+/**
+ * Parses inline chord definitions from song content.
+ * Supports formats like "F#m:* x4420x" and "C#m: x-11-11-9-0-x".
+ * Returns a map of chordName -> fret array (6 values: -1 = muted, 0+ = fret).
+ */
+export const extractCustomChords = (content: string): Record<string, number[]> => {
+  if (!content) return {};
+  const result: Record<string, number[]> = {};
+  for (const line of content.split('\n')) {
+    const clean = line.replace(/<[^>]*>?/gm, '').trim();
+    if (!CUSTOM_CHORD_LINE_RE.test(clean)) continue;
+    const colonIdx = clean.indexOf(':');
+    const chordName = clean.slice(0, colonIdx).trim();
+    const rest = clean.slice(colonIdx + 1).replace(/^\*?\s*/, '').trim();
+    // Parse positions: either compact "x4420x" or dash-separated "x-11-11-9-0-x"
+    let positions: number[];
+    if (rest.includes('-') && /[0-9]{2}/.test(rest)) {
+      // Dash-separated (multi-digit frets)
+      positions = rest.split('-').map(p => p === 'x' || p === 'X' ? -1 : parseInt(p, 10));
+    } else {
+      // Compact single-char per string
+      positions = rest.split('').map(c => c === 'x' || c === 'X' ? -1 : parseInt(c, 10));
+    }
+    if (positions.length === 6) {
+      result[chordName] = positions;
+    }
+  }
+  return result;
+};
+
 export const renderSongContent = (content: string, isEditor: boolean = false, onChordClick?: (chord: string) => void) => {
   if (!content) return null;
   
@@ -24,6 +58,11 @@ export const renderSongContent = (content: string, isEditor: boolean = false, on
     // Strip existing HTML tags just in case
     let cleanLine = line.replace(/<[^>]*>?/gm, '');
     const newline = index < lines.length - 1 ? '\n' : '';
+
+    // Hide inline chord definition lines (e.g. "F#m:* x4420x") — they are shown in diagrams instead
+    if (CUSTOM_CHORD_LINE_RE.test(cleanLine.trim())) {
+      return <span key={index} style={{ display: 'none' }}>{newline}</span>;
+    }
     
     // Check for "Tom: G"
     const tomMatch = cleanLine.match(/^(Tom:\s*)(.*)$/i);
