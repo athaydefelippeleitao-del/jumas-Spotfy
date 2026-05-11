@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import * as ReactChords from '@tombatossals/react-chords/lib/Chord';
 
 // Handle both ES module default exports and CommonJS exports
@@ -13,11 +14,23 @@ interface ChordDiagramsProps {
   customChords?: Record<string, number[]>;
 }
 
+// Global JUMAS Chord Dictionary - Specific shapes used in this app
+const JUMAS_DICTIONARY: Record<string, number[]> = {
+  'A': [-1, 0, -1, 6, 0, 5], // As requested by user: x0x605
+  'B': [-1, 2, 4, 4, 4, 2],
+  'G': [3, 2, 0, 0, 3, 3],
+  'B7sus4': [-1, 2, 4, 2, 5, 2],
+};
+
 export const ChordDiagrams: React.FC<ChordDiagramsProps> = ({ chords, highlightedChord, customChords = {} }) => {
+  const { t } = useTranslation();
   const [isVisible, setIsVisible] = useState(true);
 
+  // Merge global JUMAS dictionary with per-song custom chords
+  const allCustomChords = { ...JUMAS_DICTIONARY, ...customChords };
+
   // Auto-show if a chord is highlighted
-  React.useEffect(() => {
+  useEffect(() => {
     if (highlightedChord) {
       setIsVisible(true);
     }
@@ -142,7 +155,7 @@ export const ChordDiagrams: React.FC<ChordDiagramsProps> = ({ chords, highlighte
           <div className="w-6 h-6 rounded-full bg-[#F27D26]/10 flex items-center justify-center text-[#F27D26]">
             <Music size={14} />
           </div>
-          <h3 className="text-sm font-black text-text-primary tracking-tight">Diagramas de Acordes</h3>
+          <h3 className="text-sm font-black text-text-primary tracking-tight">{t('songbook.chordDictionary')}</h3>
         </div>
         
         <div className="flex items-center gap-4">
@@ -150,7 +163,7 @@ export const ChordDiagrams: React.FC<ChordDiagramsProps> = ({ chords, highlighte
             onClick={() => setIsVisible(!isVisible)}
             className="text-xs font-bold text-text-secondary hover:text-[#F27D26] transition-colors uppercase tracking-widest"
           >
-            {isVisible ? 'Esconder' : 'Mostrar'}
+            {isVisible ? t('songbook.hide') : t('songbook.show')}
           </button>
         </div>
       </div>
@@ -164,8 +177,8 @@ export const ChordDiagrams: React.FC<ChordDiagramsProps> = ({ chords, highlighte
             className="overflow-hidden"
           >
             <div className="flex overflow-x-auto gap-2 p-2 bg-bg-primary rounded-xl border border-border-color shadow-inner custom-scrollbar items-start">
-              {/* Custom inline-defined chords */}
-              {Object.entries(customChords).map(([chordName, positionsRaw]) => {
+              {/* Custom inline-defined or JUMAS dictionary chords */}
+              {Object.entries(allCustomChords).map(([chordName, positionsRaw]) => {
                 const positions = positionsRaw as number[];
                 // Build chord data in the format expected by @tombatossals/react-chords
                 const frets = positions.map(p => p === -1 ? 0 : p);
@@ -194,8 +207,8 @@ export const ChordDiagrams: React.FC<ChordDiagramsProps> = ({ chords, highlighte
               })}
               {/* Database-resolved chords */}
               {chords.map((chordName, index) => {
-                // Skip if already shown as custom
-                if (customChords[chordName]) return null;
+                // Skip if already shown as custom/dictionary
+                if (allCustomChords[chordName]) return null;
                 const chordData = getChordData(chordName);
                 if (!chordData) return null;
 
@@ -221,9 +234,9 @@ export const ChordDiagrams: React.FC<ChordDiagramsProps> = ({ chords, highlighte
                   </div>
                 );
               })}
-              {chords.length > 0 && chords.every(c => customChords[c] || !getChordData(c)) && Object.keys(customChords).length === 0 && (
+              {chords.length > 0 && chords.every(c => allCustomChords[c] || !getChordData(c)) && Object.keys(allCustomChords).length === 0 && (
                 <p className="text-xs text-text-secondary italic w-full text-center py-4">
-                  Diagramas não disponíveis para os acordes desta música.
+                  {t('songbook.noDiagrams')}
                 </p>
               )}
             </div>
