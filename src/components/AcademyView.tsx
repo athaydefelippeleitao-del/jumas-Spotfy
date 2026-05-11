@@ -1,10 +1,69 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, Play, FileText, Trash2, Edit2, ChevronLeft, ChevronRight, X, ExternalLink, BookOpen, Camera, Image as ImageIcon, RotateCcw } from 'lucide-react';
+import { Search, Plus, Play, FileText, Trash2, Edit2, ChevronLeft, ChevronRight, X, BookOpen, Camera, Image as ImageIcon, Video, Upload, Link as LinkIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { ChordEditor } from './ChordEditor';
 import { DeleteAcademyItemConfirmModal } from './DeleteAcademyItemConfirmModal';
 import { useTranslation } from 'react-i18next';
+
+// ─── Video helpers ────────────────────────────────────────────────────────────
+type VideoKind = 'youtube' | 'vimeo' | 'direct' | 'base64' | 'none';
+
+function detectVideoKind(url?: string): VideoKind {
+  if (!url) return 'none';
+  if (url.startsWith('data:video/')) return 'base64';
+  if (/youtu\.be\/|youtube\.com\/(watch|embed|shorts)/i.test(url)) return 'youtube';
+  if (/vimeo\.com/i.test(url)) return 'vimeo';
+  if (/\.(mp4|webm|ogg)(\?.*)?$/i.test(url)) return 'direct';
+  // Google Drive share links
+  if (/drive\.google\.com\/file\/d\/([^/]+)/i.test(url)) return 'direct';
+  return 'none';
+}
+
+function toEmbedUrl(url: string, kind: VideoKind): string {
+  if (kind === 'youtube') {
+    const ytId =
+      url.match(/youtu\.be\/([^?]+)/)?.[1] ||
+      url.match(/[?&]v=([^&]+)/)?.[1] ||
+      url.match(/\/shorts\/([^?]+)/)?.[1] ||
+      url.match(/\/embed\/([^?]+)/)?.[1];
+    return ytId ? `https://www.youtube.com/embed/${ytId}?rel=0` : url;
+  }
+  if (kind === 'vimeo') {
+    const vId = url.match(/vimeo\.com\/(?:video\/)?([0-9]+)/)?.[1];
+    return vId ? `https://player.vimeo.com/video/${vId}` : url;
+  }
+  // Google Drive: convert share URL to preview
+  const driveId = url.match(/drive\.google\.com\/file\/d\/([^/]+)/)?.[1];
+  if (driveId) return `https://drive.google.com/file/d/${driveId}/preview`;
+  return url;
+}
+
+interface VideoPlayerProps { url: string; title: string; }
+const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, title }) => {
+  const kind = detectVideoKind(url);
+  if (kind === 'none') return null;
+  if (kind === 'base64' || kind === 'direct') {
+    return (
+      <video
+        src={url}
+        controls
+        className="w-full h-full rounded-3xl"
+        title={title}
+        playsInline
+      />
+    );
+  }
+  return (
+    <iframe
+      src={toEmbedUrl(url, kind)}
+      className="w-full h-full"
+      allowFullScreen
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      title={title}
+    />
+  );
+};
 
 interface AcademyItem {
   id: string;
@@ -21,6 +80,9 @@ export const AcademyView: React.FC = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoFileInputRef = useRef<HTMLInputElement>(null);
+  const [videoTab, setVideoTab] = useState<'link' | 'upload'>('link');
+  const [videoUploadName, setVideoUploadName] = useState('');
 
   const [items, setItems] = useState<AcademyItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -70,6 +132,22 @@ export const AcademyView: React.FC = () => {
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const MAX_MB = 100;
+    if (file.size > MAX_MB * 1024 * 1024) {
+      alert(`O vídeo deve ter no máximo ${MAX_MB}MB.`);
+      return;
+    }
+    setVideoUploadName(file.name);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormData(prev => ({ ...prev, videoUrl: reader.result as string }));
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -246,14 +324,9 @@ export const AcademyView: React.FC = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
-          {selectedItem.videoUrl && (
+          {selectedItem.videoUrl && detectVideoKind(selectedItem.videoUrl) !== 'none' && (
             <div className="mb-8 aspect-video rounded-3xl overflow-hidden bg-black shadow-2xl">
-              <iframe 
-                src={selectedItem.videoUrl.replace('watch?v=', 'embed/')} 
-                className="w-full h-full"
-                allowFullScreen
-                title={selectedItem.title}
-              />
+              <VideoPlayer url={selectedItem.videoUrl} title={selectedItem.title} />
             </div>
           )}
 
@@ -443,14 +516,61 @@ export const AcademyView: React.FC = () => {
                   </div>
 
                   {formData.type === 'tutorial' ? (
-                    <div>
-                      <label className="block text-[10px] font-black uppercase tracking-widest text-text-secondary mb-2 ml-2">{t('academy.videoUrlLabel')}</label>
-                      <input 
-                        type="url"
-                        value={formData.videoUrl}
-                        onChange={e => setFormData(prev => ({ ...prev, videoUrl: e.target.value }))}
-                        className="w-full bg-bg-secondary border border-border-color rounded-2xl px-6 py-4 focus:outline-none focus:ring-2 focus:ring-jumas-green/50 focus:border-jumas-green transition-all"
-                        placeholder={t('academy.videoUrlPlaceholder')}
+                    <div className="space-y-3">
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-text-secondary mb-1 ml-2">Vídeo do Tutorial</label>
+                      {/* Tab selector */}
+                      <div className="grid grid-cols-2 gap-2 p-1 bg-bg-secondary rounded-xl">
+                        <button type="button" onClick={() => setVideoTab('link')}
+                          className={`py-2 rounded-lg text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${
+                            videoTab === 'link' ? 'bg-bg-primary text-jumas-green shadow-sm' : 'text-text-secondary hover:text-text-primary'
+                          }`}>
+                          <LinkIcon size={13} /> Link
+                        </button>
+                        <button type="button" onClick={() => setVideoTab('upload')}
+                          className={`py-2 rounded-lg text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${
+                            videoTab === 'upload' ? 'bg-bg-primary text-jumas-green shadow-sm' : 'text-text-secondary hover:text-text-primary'
+                          }`}>
+                          <Upload size={13} /> Enviar arquivo
+                        </button>
+                      </div>
+
+                      {videoTab === 'link' ? (
+                        <div>
+                          <input
+                            type="url"
+                            value={formData.videoUrl.startsWith('data:') ? '' : formData.videoUrl}
+                            onChange={e => { setVideoUploadName(''); setFormData(prev => ({ ...prev, videoUrl: e.target.value })); }}
+                            className="w-full bg-bg-secondary border border-border-color rounded-2xl px-6 py-4 focus:outline-none focus:ring-2 focus:ring-jumas-green/50 focus:border-jumas-green transition-all"
+                            placeholder="YouTube, Vimeo, Google Drive ou link direto (.mp4)"
+                          />
+                          <p className="text-[10px] text-text-secondary/60 mt-1 ml-2">Suporta YouTube, Vimeo, Google Drive e links .mp4</p>
+                        </div>
+                      ) : (
+                        <div
+                          onClick={() => videoFileInputRef.current?.click()}
+                          className="w-full rounded-2xl bg-bg-secondary border-2 border-dashed border-border-color hover:border-jumas-green transition-all cursor-pointer flex flex-col items-center justify-center py-8 gap-3"
+                        >
+                          {videoUploadName || formData.videoUrl.startsWith('data:video/') ? (
+                            <>
+                              <Video size={36} className="text-jumas-green" />
+                              <p className="text-sm font-bold text-text-primary">{videoUploadName || 'Vídeo carregado'}</p>
+                              <p className="text-[10px] text-text-secondary">Clique para trocar</p>
+                            </>
+                          ) : (
+                            <>
+                              <Upload size={36} className="text-text-secondary" />
+                              <p className="text-sm font-bold text-text-primary">Clique para enviar um vídeo</p>
+                              <p className="text-[10px] text-text-secondary">MP4, WebM ou OGG — máx. 100 MB</p>
+                            </>
+                          )}
+                        </div>
+                      )}
+                      <input
+                        type="file"
+                        ref={videoFileInputRef}
+                        onChange={handleVideoUpload}
+                        accept="video/mp4,video/webm,video/ogg"
+                        className="hidden"
                       />
                     </div>
                   ) : (
