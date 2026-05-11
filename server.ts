@@ -20,8 +20,27 @@ const supabaseUrl = process.env.SUPABASE_URL || "";
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Seeding default admin if needed is handled via SQL or can be done here.
-// For now, we assume the migration.sql has set up the schema.
+// ─── Cache em memória (server-side) ──────────────────────────────────────────
+// Guarda as respostas das APIs principais para evitar round-trips ao Supabase
+// a cada request. Invalida automaticamente após o TTL.
+interface MemCacheEntry { data: any; expiresAt: number; }
+const memCache = new Map<string, MemCacheEntry>();
+const MEM_TTL_MS = 2 * 60 * 1000; // 2 minutos
+
+function getCached(key: string): any | null {
+  const entry = memCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) { memCache.delete(key); return null; }
+  return entry.data;
+}
+function setCache(key: string, data: any, ttl = MEM_TTL_MS) {
+  memCache.set(key, { data, expiresAt: Date.now() + ttl });
+}
+function invalidateCache(...keys: string[]) {
+  keys.forEach(k => memCache.delete(k));
+}
+
+
 
 async function startServer() {
   const app = express();
@@ -255,9 +274,12 @@ async function startServer() {
 
   // Artist management routes
   app.get("/api/artists", async (req, res) => {
+    const cached = getCached('artists');
+    if (cached) return res.json({ artists: cached });
     try {
       const { data: artists, error } = await supabase.from('artists').select('*');
       if (error) throw error;
+      setCache('artists', artists);
       res.json({ artists });
     } catch (error) {
       res.status(500).json({ error: "Erro ao buscar artistas" });
@@ -273,6 +295,7 @@ async function startServer() {
         .select()
         .single();
       if (error) throw error;
+      invalidateCache('artists');
       res.json({ artist });
     } catch (error) {
       res.status(500).json({ error: "Erro ao criar artista" });
@@ -308,9 +331,12 @@ async function startServer() {
 
   // Songbook management routes
   app.get("/api/songbooks", async (req, res) => {
+    const cached = getCached('songbooks');
+    if (cached) return res.json({ songbooks: cached });
     try {
       const { data: songbooks, error } = await supabase.from('songbooks').select('*');
       if (error) throw error;
+      setCache('songbooks', songbooks);
       res.json({ songbooks });
     } catch (error) {
       res.status(500).json({ error: "Erro ao buscar cancioneiros" });
@@ -326,6 +352,7 @@ async function startServer() {
         .select()
         .single();
       if (error) throw error;
+      invalidateCache('songbooks');
       res.json({ songbook });
     } catch (error) {
       res.status(500).json({ error: "Erro ao criar cancioneiro" });
@@ -341,6 +368,7 @@ async function startServer() {
         .update({ name, image, pdfUrl })
         .eq('id', id);
       if (error) throw error;
+      invalidateCache('songbooks');
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Erro ao atualizar cancioneiro" });
@@ -350,13 +378,12 @@ async function startServer() {
   app.delete("/api/songbooks/:id", isAdmin, async (req, res) => {
     const { id } = req.params;
     try {
-      // Deleting related items manually because we might not have cascading set up in Supabase initially
-      // (Though I did add it to the migration SQL for some tables)
       await supabase.from('user_favorites').delete().in('songId', (await supabase.from('songs').select('id').eq('songbookId', id)).data?.map(s => s.id) || []);
       await supabase.from('playlist_songs').delete().in('songId', (await supabase.from('songs').select('id').eq('songbookId', id)).data?.map(s => s.id) || []);
       await supabase.from('songs').delete().eq('songbookId', id);
       const { error } = await supabase.from('songbooks').delete().eq('id', id);
       if (error) throw error;
+      invalidateCache('songbooks', 'songs');
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Erro ao excluir cancioneiro" });
@@ -367,7 +394,7 @@ async function startServer() {
   app.get("/api/songs", async (req, res) => {
     const token = req.cookies.token;
     let userId: number | null = null;
-    
+
     if (token) {
       try {
         const decoded = jwt.verify(token, JWT_SECRET) as any;
@@ -376,9 +403,15 @@ async function startServer() {
     }
 
     try {
-      const { data: songs, error } = await supabase.from('songs').select('*');
-      if (error) throw error;
-      
+      // Cache base songs (sem favoritos — favoritos são por usuário)
+      let songs = getCached('songs_base');
+      if (!songs) {
+        const { data, error } = await supabase.from('songs').select('*');
+        if (error) throw error;
+        songs = data;
+        setCache('songs_base', songs);
+      }
+
       let favoriteSongIds: any[] = [];
       if (userId) {
         const { data: favorites } = await supabase.from('user_favorites').select('songId').eq('userId', userId);
@@ -390,7 +423,7 @@ async function startServer() {
         isFavorite: favoriteSongIds.includes(song.id),
         videoUrls: song.videoUrls || []
       }));
-      
+
       res.json({ songs: mappedSongs });
     } catch (error) {
       console.error("Error fetching songs:", error);
@@ -463,6 +496,7 @@ async function startServer() {
         .single();
       
       if (error) throw error;
+      invalidateCache('songs_base');
       res.json({ song });
     } catch (error) {
       console.error('Error creating song:', error);
@@ -481,6 +515,7 @@ async function startServer() {
     try {
       const { error } = await supabase.from('songs').update(updates).eq('id', id);
       if (error) throw error;
+      invalidateCache('songs_base');
       res.json({ success: true });
     } catch (error) {
       console.error('Error updating song:', error);
@@ -495,6 +530,7 @@ async function startServer() {
       await supabase.from('playlist_songs').delete().eq('songId', id);
       const { error } = await supabase.from('songs').delete().eq('id', id);
       if (error) throw error;
+      invalidateCache('songs_base');
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Erro ao excluir música" });
