@@ -24,7 +24,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { renderSongContent, extractChords, extractCustomChords } from '../utils/chordParser';
 import { ChordDiagrams } from './ChordDiagrams';
 import { SongCover } from './SongCover';
-import { fetchWithCache } from '../hooks/useOfflineCache';
+import { fetchWithCache, loadFromCache, saveToCache } from '../hooks/useOfflineCache';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 export const Songbook: React.FC = () => {
@@ -41,71 +41,79 @@ export const Songbook: React.FC = () => {
   const [isLoadingSongbooks, setIsLoadingSongbooks] = useState(true);
 
   useEffect(() => {
-    // Phase 1: load songbooks first so the home screen appears instantly
-    const fetchPriority = async () => {
-      const result = await fetchWithCache(
-        'songbooks',
-        async () => {
-          const res = await fetch('/api/songbooks');
-          if (!res.ok) throw new Error('Failed to fetch songbooks');
-          const data = await res.json();
-          return data.songbooks.map((sb: any) => ({ ...sb, id: sb.id.toString() }));
-        }
-      );
-      if (result.data) {
-        setSongbooks(result.data);
-      }
+    // ── Stale-While-Revalidate ─────────────────────────────────────────────────
+    // 1) Mostrar cache LOCAL imediatamente (sem await, sem esperar rede)
+    // 2) Buscar dados frescos da rede em background e atualizar silenciosamente
+
+    const mapSongbook = (sb: any) => ({ ...sb, id: sb.id.toString() });
+    const mapArtist   = (a: any)  => ({ ...a, id: a.id.toString() });
+    const mapSong     = (s: any)  => ({
+      ...s,
+      id: s.id.toString(),
+      songbookId: s.songbookId.toString(),
+      artistId: s.artistId ? s.artistId.toString() : null,
+      artistIds: s.artistIds || [],
+      isFavorite: !!s.isFavorite,
+    });
+    const mapPlaylist = (p: any) => ({ ...p, id: p.id.toString() });
+
+    // — Fase 1: exibir cache instantaneamente —
+    const cachedSongbooks = loadFromCache<any[]>('songbooks');
+    if (cachedSongbooks) {
+      setSongbooks(cachedSongbooks);
       setIsLoadingSongbooks(false);
-    };
+    }
+    const cachedArtists = loadFromCache<any[]>('artists');
+    if (cachedArtists) setArtists(cachedArtists);
+    const cachedSongs = loadFromCache<any[]>('songs');
+    if (cachedSongs) setSongs(cachedSongs);
 
-    // Phase 2: load remaining data in background (songs, artists, playlists)
-    const fetchBackground = async () => {
-      const [artResult, songResult] = await Promise.all([
-        fetchWithCache(
-          'artists',
-          async () => {
-            const res = await fetch('/api/artists');
-            if (!res.ok) throw new Error('Failed');
-            const data = await res.json();
-            return data.artists.map((a: any) => ({ ...a, id: a.id.toString() }));
-          }
-        ),
-        fetchWithCache(
-          'songs',
-          async () => {
-            const res = await fetch('/api/songs');
-            if (!res.ok) throw new Error('Failed');
-            const data = await res.json();
-            return data.songs.map((s: any) => ({
-              ...s,
-              id: s.id.toString(),
-              songbookId: s.songbookId.toString(),
-              artistId: s.artistId ? s.artistId.toString() : null,
-              artistIds: s.artistIds || [],
-              isFavorite: !!s.isFavorite
-            }));
-          }
-        ),
-      ]);
-
-      if (artResult.data) setArtists(artResult.data);
-      if (songResult.data) setSongs(songResult.data);
-
-      // Playlists precisam de auth — só buscar online
-      if (isOnline) {
-        try {
-          const playRes = await fetch('/api/playlists');
-          if (playRes.ok) {
-            const data = await playRes.json();
-            setPlaylists(data.playlists.map((p: any) => ({ ...p, id: p.id.toString() })));
-          }
-        } catch {
-          // Sem playlists offline é aceitável
+    // — Fase 2: revalidar da rede em background —
+    const revalidate = async () => {
+      try {
+        // Songbooks (prioridade — aparece na home)
+        const sbRes = await fetch('/api/songbooks');
+        if (sbRes.ok) {
+          const data = await sbRes.json();
+          const fresh = data.songbooks.map(mapSongbook);
+          setSongbooks(fresh);
+          saveToCache('songbooks', fresh);
         }
+      } catch { /* mantém o cache */ } finally {
+        setIsLoadingSongbooks(false); // garante que o spinner sai mesmo sem cache
       }
+
+      // Artistas e músicas em paralelo
+      try {
+        const [artRes, songRes] = await Promise.all([
+          fetch('/api/artists'),
+          fetch('/api/songs'),
+        ]);
+        if (artRes.ok) {
+          const data = await artRes.json();
+          const fresh = data.artists.map(mapArtist);
+          setArtists(fresh);
+          saveToCache('artists', fresh);
+        }
+        if (songRes.ok) {
+          const data = await songRes.json();
+          const fresh = data.songs.map(mapSong);
+          setSongs(fresh);
+          saveToCache('songs', fresh);
+        }
+      } catch { /* mantém o cache */ }
+
+      // Playlists (requer auth, sem cache)
+      try {
+        const playRes = await fetch('/api/playlists');
+        if (playRes.ok) {
+          const data = await playRes.json();
+          setPlaylists(data.playlists.map(mapPlaylist));
+        }
+      } catch { /* sem playlists offline é aceitável */ }
     };
 
-    fetchPriority().then(() => fetchBackground());
+    revalidate();
   }, []);
 
   const [activeSongbookId, setActiveSongbookId] = useState<string | null>(null);
