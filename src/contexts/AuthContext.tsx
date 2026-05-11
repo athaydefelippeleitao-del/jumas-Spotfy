@@ -66,7 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch (error) {
         if (retries > 0) {
           console.warn(`Auth check failed, retrying... (${retries} left)`, error);
-          setTimeout(() => checkAuth(retries - 1), 1000);
+          setTimeout(() => checkAuth(retries - 1), 500);
           return;
         }
         // Offline ou servidor inacessível após retries: manter usuário do cache

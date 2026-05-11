@@ -24,8 +24,8 @@ export const LoadingScreen: React.FC = () => {
     };
     fetchLoadingImage();
 
-    // Progress bar will reach 100% in 4.5 seconds, then stay at 100% for 0.5s before transition
-    const duration = 4500; 
+    // Progress bar animates quickly — the loading screen exits as soon as auth is done
+    const duration = 1500;
     const intervalTime = 50;
     const steps = duration / intervalTime;
     const increment = 100 / steps;

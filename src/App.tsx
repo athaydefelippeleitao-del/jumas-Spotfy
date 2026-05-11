@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Header } from './components/Header';
 import { Songbook } from './components/Songbook';
 import { LoadingScreen } from './components/LoadingScreen';
@@ -13,11 +13,10 @@ import { useAuth } from './contexts/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
-  const [isLoading, setIsLoading] = useState(true);
   const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
-    // Fetch app icon and set as favicon
+    // Fetch app icon and set as favicon (fire and forget)
     const fetchAppIcon = async (retries = 3) => {
       try {
         const res = await fetch('/api/settings/app-icon');
@@ -31,8 +30,7 @@ export default function App() {
               document.getElementsByTagName('head')[0].appendChild(link);
             }
             link.href = data.url;
-            
-            // Also set apple-touch-icon for mobile
+
             let appleLink = document.querySelector("link[rel~='apple-touch-icon']") as HTMLLinkElement;
             if (!appleLink) {
               appleLink = document.createElement('link');
@@ -45,26 +43,17 @@ export default function App() {
       } catch (error) {
         if (retries > 0) {
           setTimeout(() => fetchAppIcon(retries - 1), 1000);
-        } else {
-          console.error('Failed to fetch app icon after retries:', error);
         }
       }
     };
     fetchAppIcon();
-
-    // Reduce the loading screen stay to 2 seconds
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 2000);
-    
-    return () => clearTimeout(timer);
   }, []);
 
   return (
     <div className="min-h-screen flex flex-col font-sans text-text-primary bg-bg-secondary transition-colors duration-300">
       <OfflineBanner />
       <AnimatePresence mode="wait">
-        {isLoading || authLoading ? (
+        {authLoading ? (
           <LoadingScreen key="loading" />
         ) : !user ? (
           <motion.div
