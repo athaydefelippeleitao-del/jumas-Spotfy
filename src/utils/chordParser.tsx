@@ -15,8 +15,8 @@ const renderTextWithBold = (text: string) => {
 };
 
 // Regex to detect inline chord definition lines like:
-// "F#m:* x4420x"  or  "C#m: x-11-11-9-0-x"
-const CUSTOM_CHORD_LINE_RE = /^[A-G][#b]?[^:\s]*:\*?\s+[x0-9][0-9x-]+$/i;
+// "F#m:* x4420x"  or  "C#m: x-11-11-9-0-x"  or  "La:* x0x605"
+const CUSTOM_CHORD_LINE_RE = /^([A-G][#b]?|Do|Ré?|Mi|Fá?|Sol|Lá?|Si)[^:\s]*:\*?\s+[x0-9][0-9x-]+$/i;
 
 /**
  * Parses inline chord definitions from song content.
@@ -59,8 +59,17 @@ export const renderSongContent = (content: string, isEditor: boolean = false, on
     let cleanLine = line.replace(/<[^>]*>?/gm, '');
     const newline = index < lines.length - 1 ? '\n' : '';
 
-    // Hide inline chord definition lines (e.g. "F#m:* x4420x") — they are shown in diagrams instead
+    // Handle inline chord definition lines (e.g. "F#m:* x4420x")
     if (CUSTOM_CHORD_LINE_RE.test(cleanLine.trim())) {
+      if (isEditor) {
+        // Show in editor with a special color
+        return (
+          <span key={index} className="text-text-secondary italic opacity-60">
+            {line}{newline}
+          </span>
+        );
+      }
+      // Hide in viewer
       return <span key={index} style={{ display: 'none' }}>{newline}</span>;
     }
     
