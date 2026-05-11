@@ -1032,7 +1032,23 @@ export const Songbook: React.FC = () => {
             </div>
           </div>
 
-          {songbooks.length === 0 && (
+          {/* Skeleton loading — enquanto busca da rede */}
+          {isLoadingSongbooks && songbooks.length === 0 && (
+            <div className="flex flex-col gap-2">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex items-center gap-4 p-3 bg-bg-elevated rounded-2xl border border-border-color animate-pulse">
+                  <div className="w-14 h-14 rounded-xl bg-bg-secondary flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-bg-secondary rounded-lg w-2/3" />
+                    <div className="h-3 bg-bg-secondary rounded-lg w-1/3" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Estado vazio — só mostra quando terminou de carregar e não tem nada */}
+          {!isLoadingSongbooks && songbooks.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 md:py-20 text-center px-6">
               <div className="w-20 h-20 bg-bg-secondary rounded-full flex items-center justify-center mb-6 shadow-inner">
                 <Book size={32} className="text-text-secondary opacity-20" />
