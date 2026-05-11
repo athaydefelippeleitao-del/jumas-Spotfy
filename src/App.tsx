@@ -8,6 +8,7 @@ import { Header } from './components/Header';
 import { Songbook } from './components/Songbook';
 import { LoadingScreen } from './components/LoadingScreen';
 import { AuthModal } from './components/AuthModal';
+import { OfflineBanner } from './components/OfflineBanner';
 import { useAuth } from './contexts/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -61,6 +62,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col font-sans text-text-primary bg-bg-secondary transition-colors duration-300">
+      <OfflineBanner />
       <AnimatePresence mode="wait">
         {isLoading || authLoading ? (
           <LoadingScreen key="loading" />

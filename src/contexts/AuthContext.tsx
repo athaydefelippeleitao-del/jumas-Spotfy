@@ -20,8 +20,28 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const AUTH_CACHE_KEY = 'jumas_cached_user';
+
+function saveUserToCache(user: User | null): void {
+  if (user) {
+    localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify(user));
+  } else {
+    localStorage.removeItem(AUTH_CACHE_KEY);
+  }
+}
+
+function loadUserFromCache(): User | null {
+  try {
+    const raw = localStorage.getItem(AUTH_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  // Inicializar com usuário do cache (evita flash de tela de login quando offline)
+  const [user, setUser] = useState<User | null>(() => loadUserFromCache());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -32,13 +52,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (res.ok) {
           const data = await res.json();
           setUser(data.user);
+          saveUserToCache(data.user);
           shouldStopLoading = true;
         } else if (res.status === 401) {
-          // Explicit unauthorized, no need to retry
+          // Sem autenticação válida: limpar cache e usuário
           setUser(null);
+          saveUserToCache(null);
           shouldStopLoading = true;
         } else {
-          // Other error status, log and stop
           console.error('Auth check failed with status', res.status);
           shouldStopLoading = true;
         }
@@ -48,7 +69,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setTimeout(() => checkAuth(retries - 1), 1000);
           return;
         }
-        console.error('Auth check failed after retries', error);
+        // Offline ou servidor inacessível após retries: manter usuário do cache
+        console.warn('Auth check failed after retries. Using cached user:', loadUserFromCache()?.username);
+        // Não limpar o user — ele já foi inicializado do cache no useState
         shouldStopLoading = true;
       } finally {
         if (shouldStopLoading) {
@@ -62,14 +85,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = (userData: User) => {
     setUser(userData);
+    saveUserToCache(userData);
   };
 
   const logout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
-      setUser(null);
     } catch (error) {
       console.error('Logout failed', error);
+    } finally {
+      // Limpar sempre, mesmo offline
+      setUser(null);
+      saveUserToCache(null);
     }
   };
 

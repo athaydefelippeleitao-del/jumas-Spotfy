@@ -24,11 +24,14 @@ import { useAuth } from '../contexts/AuthContext';
 import { renderSongContent, extractChords, extractCustomChords } from '../utils/chordParser';
 import { ChordDiagrams } from './ChordDiagrams';
 import { SongCover } from './SongCover';
+import { fetchWithCache } from '../hooks/useOfflineCache';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 export const Songbook: React.FC = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const isOnline = useOnlineStatus();
 
   const [songbooks, setSongbooks] = useState<{id: string, name: string, image?: string, pdfUrl?: string}[]>([]);
   const [categories, setCategories] = useState<string[]>(initialCategories);
@@ -40,48 +43,65 @@ export const Songbook: React.FC = () => {
   useEffect(() => {
     // Phase 1: load songbooks first so the home screen appears instantly
     const fetchPriority = async () => {
-      try {
-        const sbRes = await fetch('/api/songbooks');
-        if (sbRes.ok) {
-          const data = await sbRes.json();
-          setSongbooks(data.songbooks.map((sb: any) => ({ ...sb, id: sb.id.toString() })));
+      const result = await fetchWithCache(
+        'songbooks',
+        async () => {
+          const res = await fetch('/api/songbooks');
+          if (!res.ok) throw new Error('Failed to fetch songbooks');
+          const data = await res.json();
+          return data.songbooks.map((sb: any) => ({ ...sb, id: sb.id.toString() }));
         }
-      } catch (error) {
-        console.error('Failed to fetch songbooks', error);
-      } finally {
-        setIsLoadingSongbooks(false);
+      );
+      if (result.data) {
+        setSongbooks(result.data);
       }
+      setIsLoadingSongbooks(false);
     };
 
     // Phase 2: load remaining data in background (songs, artists, playlists)
     const fetchBackground = async () => {
-      try {
-        const [artRes, songRes, playRes] = await Promise.all([
-          fetch('/api/artists'),
-          fetch('/api/songs'),
-          fetch('/api/playlists')
-        ]);
-        if (artRes.ok) {
-          const data = await artRes.json();
-          setArtists(data.artists.map((a: any) => ({ ...a, id: a.id.toString() })));
+      const [artResult, songResult] = await Promise.all([
+        fetchWithCache(
+          'artists',
+          async () => {
+            const res = await fetch('/api/artists');
+            if (!res.ok) throw new Error('Failed');
+            const data = await res.json();
+            return data.artists.map((a: any) => ({ ...a, id: a.id.toString() }));
+          }
+        ),
+        fetchWithCache(
+          'songs',
+          async () => {
+            const res = await fetch('/api/songs');
+            if (!res.ok) throw new Error('Failed');
+            const data = await res.json();
+            return data.songs.map((s: any) => ({
+              ...s,
+              id: s.id.toString(),
+              songbookId: s.songbookId.toString(),
+              artistId: s.artistId ? s.artistId.toString() : null,
+              artistIds: s.artistIds || [],
+              isFavorite: !!s.isFavorite
+            }));
+          }
+        ),
+      ]);
+
+      if (artResult.data) setArtists(artResult.data);
+      if (songResult.data) setSongs(songResult.data);
+
+      // Playlists precisam de auth — só buscar online
+      if (isOnline) {
+        try {
+          const playRes = await fetch('/api/playlists');
+          if (playRes.ok) {
+            const data = await playRes.json();
+            setPlaylists(data.playlists.map((p: any) => ({ ...p, id: p.id.toString() })));
+          }
+        } catch {
+          // Sem playlists offline é aceitável
         }
-        if (songRes.ok) {
-          const data = await songRes.json();
-          setSongs(data.songs.map((s: any) => ({ 
-            ...s, 
-            id: s.id.toString(), 
-            songbookId: s.songbookId.toString(),
-            artistId: s.artistId ? s.artistId.toString() : null,
-            artistIds: s.artistIds || [],
-            isFavorite: !!s.isFavorite
-          })));
-        }
-        if (playRes.ok) {
-          const data = await playRes.json();
-          setPlaylists(data.playlists.map((p: any) => ({ ...p, id: p.id.toString() })));
-        }
-      } catch (error) {
-        console.error('Failed to fetch background data', error);
       }
     };
 
