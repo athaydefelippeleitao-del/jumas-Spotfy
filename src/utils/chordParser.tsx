@@ -59,11 +59,7 @@ export const renderSongContent = (content: string, isEditor: boolean = false, on
     let cleanLine = line.replace(/<[^>]*>?/gm, '');
     const newline = index < lines.length - 1 ? '\n' : '';
 
-    // Handle inline chord definition lines (e.g. "F#m:* x4420x")
-    if (CUSTOM_CHORD_LINE_RE.test(cleanLine.trim())) {
-      // Hide these lines from the viewer
-      return null;
-    }
+
     
     // Check for "Tom: G"
     const tomMatch = cleanLine.match(/^(Tom:\s*)(.*)$/i);
