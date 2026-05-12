@@ -11,17 +11,7 @@ interface SongCoverProps {
 export function SongCover({ song, className = "w-12 h-12 rounded-xl", iconSize = 20 }: SongCoverProps) {
   const [spotifyThumb, setSpotifyThumb] = useState<string | null>(null);
 
-  useEffect(() => {
-    const url = song?.videoUrl || (song?.videoUrls && song.videoUrls.length > 0 ? song.videoUrls[0] : null);
-    if (url && url.includes('spotify.com')) {
-      fetch(`https://open.spotify.com/oembed?url=${url}`)
-        .then(res => res.json())
-        .then(data => setSpotifyThumb(data.thumbnail_url))
-        .catch(() => setSpotifyThumb(null));
-    } else {
-      setSpotifyThumb(null);
-    }
-  }, [song?.videoUrl, song?.videoUrls]);
+
 
   const getYoutubeThumbnail = (url: string) => {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/ ;

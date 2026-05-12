@@ -1446,7 +1446,6 @@ export const Songbook: React.FC = () => {
                       key={`top-${song.id}-${index}`}
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.05 }}
                     >
                       <button
                         onClick={() => {
@@ -1491,7 +1490,6 @@ export const Songbook: React.FC = () => {
                       key={`artist-${artist.id}-${index}`}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.03 }}
                     >
                       <button
                         onClick={() => {
@@ -1532,7 +1530,6 @@ export const Songbook: React.FC = () => {
                       key={`main-list-song-${song.id}-${song.number}-${index}`}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.03 }}
                     className="relative group"
                   >
                     <button
