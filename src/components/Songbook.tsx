@@ -21,7 +21,7 @@ import { AddToPlaylistModal } from './AddToPlaylistModal';
 import { Toast, ToastType } from './Toast';
 import { Settings, User, ShieldCheck, Volume2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { renderSongContent, extractChords, extractCustomChords } from '../utils/chordParser';
+import { renderSongContent, extractChords } from '../utils/chordParser';
 import { ChordDiagrams } from './ChordDiagrams';
 import { SongCover } from './SongCover';
 import { fetchWithCache, loadFromCache, saveToCache } from '../hooks/useOfflineCache';
@@ -1917,11 +1917,7 @@ export const Songbook: React.FC = () => {
                       songTab === 'simplified' ? selectedSong.content_simplified : 
                       ''
                     )} 
-                    customChords={extractCustomChords(
-                      songTab === 'principal' ? selectedSong.content : 
-                      songTab === 'simplified' ? selectedSong.content_simplified : 
-                      ''
-                    )}
+
                     highlightedChord={activeChord}
                   />
 

@@ -14,20 +14,9 @@ interface ChordDiagramsProps {
   customChords?: Record<string, number[]>;
 }
 
-// Global JUMAS Chord Dictionary - Specific shapes used in this app
-const JUMAS_DICTIONARY: Record<string, number[]> = {
-  'A': [-1, 0, -1, 6, 0, 5], // As requested by user: x0x605
-  'B': [-1, 2, 4, 4, 4, 2],
-  'G': [3, 2, 0, 0, 3, 3],
-  'B7sus4': [-1, 2, 4, 2, 5, 2],
-};
-
-export const ChordDiagrams: React.FC<ChordDiagramsProps> = ({ chords, highlightedChord, customChords = {} }) => {
+export const ChordDiagrams: React.FC<ChordDiagramsProps> = ({ chords, highlightedChord }) => {
   const { t } = useTranslation();
   const [isVisible, setIsVisible] = useState(true);
-
-  // Merge global JUMAS dictionary with per-song custom chords
-  const allCustomChords = { ...JUMAS_DICTIONARY, ...customChords };
 
   // Auto-show if a chord is highlighted
   useEffect(() => {
@@ -36,7 +25,7 @@ export const ChordDiagrams: React.FC<ChordDiagramsProps> = ({ chords, highlighte
     }
   }, [highlightedChord]);
 
-  if (chords.length === 0 && Object.keys(customChords).length === 0) return null;
+  if (chords.length === 0) return null;
 
   const db = guitarDb;
   const instrumentData = {
@@ -177,38 +166,8 @@ export const ChordDiagrams: React.FC<ChordDiagramsProps> = ({ chords, highlighte
             className="overflow-hidden"
           >
             <div className="flex overflow-x-auto gap-2 p-2 bg-bg-primary rounded-xl border border-border-color shadow-inner custom-scrollbar items-start">
-              {/* Custom inline-defined or JUMAS dictionary chords */}
-              {Object.entries(allCustomChords).map(([chordName, positionsRaw]) => {
-                const positions = positionsRaw as number[];
-                // Build chord data in the format expected by @tombatossals/react-chords
-                const frets = positions.map(p => p === -1 ? 0 : p);
-                const muted = positions.map(p => p === -1);
-                // Find the lowest non-zero fret to use as baseFret
-                const nonZeroFrets = frets.filter(f => f > 0);
-                const baseFret = nonZeroFrets.length > 0 ? Math.min(...nonZeroFrets) : 1;
-                const fingers = frets.map(f => f > 0 ? 1 : 0);
-                const barres: any[] = [];
-                const chordData = { frets, fingers, barres, baseFret, muted };
-                return (
-                  <div
-                    key={`custom-${chordName}`}
-                    className={`flex-shrink-0 flex flex-col items-center bg-bg-secondary p-2 rounded-xl border transition-all duration-300 ${
-                      highlightedChord === chordName
-                        ? 'border-[#F27D26] ring-2 ring-[#F27D26]/20 scale-105 shadow-lg z-10'
-                        : 'border-border-color shadow-sm hover:border-text-secondary hover:shadow-md'
-                    }`}
-                  >
-                    <span className="text-sm font-black mb-1 text-[#F27D26] tracking-tight">{chordName}</span>
-                    <div className="w-16 h-20 flex items-center justify-center chord-diagram-container">
-                      <Chord chord={chordData} instrument={instrumentData} lite={true} />
-                    </div>
-                  </div>
-                );
-              })}
               {/* Database-resolved chords */}
               {chords.map((chordName, index) => {
-                // Skip if already shown as custom/dictionary
-                if (allCustomChords[chordName]) return null;
                 const chordData = getChordData(chordName);
                 if (!chordData) return null;
 
@@ -234,7 +193,7 @@ export const ChordDiagrams: React.FC<ChordDiagramsProps> = ({ chords, highlighte
                   </div>
                 );
               })}
-              {chords.length > 0 && chords.every(c => allCustomChords[c] || !getChordData(c)) && Object.keys(allCustomChords).length === 0 && (
+              {chords.length > 0 && chords.every(c => !getChordData(c)) && (
                 <p className="text-xs text-text-secondary italic w-full text-center py-4">
                   {t('songbook.noDiagrams')}
                 </p>

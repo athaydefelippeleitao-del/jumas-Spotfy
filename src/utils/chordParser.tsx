@@ -61,12 +61,8 @@ export const renderSongContent = (content: string, isEditor: boolean = false, on
 
     // Handle inline chord definition lines (e.g. "F#m:* x4420x")
     if (CUSTOM_CHORD_LINE_RE.test(cleanLine.trim())) {
-      // Always show, both in editor and viewer
-      return (
-        <span key={index} className="text-text-secondary italic opacity-60 text-xs block mb-1">
-          {line}{newline}
-        </span>
-      );
+      // Hide these lines from the viewer
+      return null;
     }
     
     // Check for "Tom: G"
