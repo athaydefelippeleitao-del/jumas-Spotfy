@@ -33,12 +33,21 @@ export const Songbook: React.FC = () => {
   const isAdmin = user?.role === 'admin';
   const isOnline = useOnlineStatus();
 
-  const [songbooks, setSongbooks] = useState<{id: string, name: string, image?: string, pdfUrl?: string}[]>([]);
+  const [songbooks, setSongbooks] = useState<{id: string, name: string, image?: string, pdfUrl?: string}[]>(() => {
+    const cached = loadFromCache<any[]>('songbooks');
+    return cached && cached.length > 0 ? cached : initialSongbooks;
+  });
   const [categories, setCategories] = useState<string[]>(initialCategories);
-  const [artists, setArtists] = useState<{id: string, name: string, photoUrl?: string, biography?: string}[]>([]);
-  const [songs, setSongs] = useState<any[]>([]);
+  const [artists, setArtists] = useState<{id: string, name: string, photoUrl?: string, biography?: string}[]>(() => {
+    const cached = loadFromCache<any[]>('artists');
+    return cached && cached.length > 0 ? cached : [];
+  });
+  const [songs, setSongs] = useState<any[]>(() => {
+    const cached = loadFromCache<any[]>('songs');
+    return cached && cached.length > 0 ? cached : initialSongs;
+  });
   const [playlists, setPlaylists] = useState<any[]>([]);
-  const [isLoadingSongbooks, setIsLoadingSongbooks] = useState(true);
+  const [isLoadingSongbooks, setIsLoadingSongbooks] = useState(false);
 
   useEffect(() => {
     // ── Stale-While-Revalidate ─────────────────────────────────────────────────
@@ -57,16 +66,8 @@ export const Songbook: React.FC = () => {
     });
     const mapPlaylist = (p: any) => ({ ...p, id: p.id.toString() });
 
-    // — Fase 1: exibir cache instantaneamente —
-    const cachedSongbooks = loadFromCache<any[]>('songbooks');
-    if (cachedSongbooks) {
-      setSongbooks(cachedSongbooks);
-      setIsLoadingSongbooks(false);
-    }
-    const cachedArtists = loadFromCache<any[]>('artists');
-    if (cachedArtists) setArtists(cachedArtists);
-    const cachedSongs = loadFromCache<any[]>('songs');
-    if (cachedSongs) setSongs(cachedSongs);
+    // — Fase 1: Inicialização síncrona (feita no useState) —
+    // Cache é carregado antes da renderização inicial
 
     // — Fase 2: revalidar da rede em background —
     const revalidate = async () => {
