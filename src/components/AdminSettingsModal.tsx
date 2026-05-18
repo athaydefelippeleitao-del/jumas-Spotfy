@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Save, Loader2, Image as ImageIcon, Camera, RotateCcw, Download, Upload } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import * as JSZip from 'jszip';
+import JSZip from 'jszip';
 
 interface AdminSettingsModalProps {
   isOpen: boolean;
@@ -119,8 +119,7 @@ export const AdminSettingsModal: React.FC<AdminSettingsModalProps> = ({ isOpen, 
         const data = await res.json();
         
         console.log("Generating ZIP backup...");
-        const JSZipConstructor = (JSZip as any).default || JSZip;
-        const zip = new JSZipConstructor();
+        const zip = new JSZip();
         zip.file("data.json", JSON.stringify(data, null, 2));
         zip.file("readme.txt", "Backup do Jumas Cifras\nGerado em: " + new Date().toLocaleString());
         
@@ -181,8 +180,7 @@ export const AdminSettingsModal: React.FC<AdminSettingsModalProps> = ({ isOpen, 
         console.log("RESTORE DEBUG: Processing ZIP file with JSZip...");
         
         // Handle different import styles for JSZip
-        const JSZipConstructor = (JSZip as any).default || JSZip;
-        const zip = new JSZipConstructor();
+        const zip = new JSZip();
         let zipContent;
         
         try {
