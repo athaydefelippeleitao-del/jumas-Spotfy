@@ -1008,7 +1008,7 @@ async function startServer() {
       res.json({ success: true });
     } catch (error: any) {
       console.error("RESTORE error:", error);
-      res.status(500).json({ error: "Erro interno ao restaurar backup", details: error.message });
+      res.status(500).json({ error: `Falha na restauração: ${error.message}`, details: error.message });
     }
   });
 
