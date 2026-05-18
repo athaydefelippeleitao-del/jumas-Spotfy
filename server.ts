@@ -872,137 +872,98 @@ async function startServer() {
       return res.status(400).json({ error: "O arquivo de backup está vazio ou em formato inválido." });
     }
 
+    // Helper: delete all rows from a table in small batches to avoid timeout
+    const deleteAllInBatches = async (table: string, idCol = 'id') => {
+      while (true) {
+        const { data, error } = await (supabase as any).from(table).select(idCol).limit(100);
+        if (error || !data || data.length === 0) break;
+        const ids = data.map((r: any) => r[idCol]);
+        await (supabase as any).from(table).delete().in(idCol, ids);
+        if (data.length < 100) break;
+      }
+    };
+
+    // Helper: insert an array in small chunks
+    const insertInChunks = async (table: string, rows: any[], chunkSize = 20) => {
+      const results: any[] = [];
+      for (let i = 0; i < rows.length; i += chunkSize) {
+        const chunk = rows.slice(i, i + chunkSize);
+        const { data, error } = await (supabase as any).from(table).insert(chunk).select();
+        if (error) throw new Error(`${table} insert error: ${error.message}`);
+        if (data) results.push(...data);
+      }
+      return results;
+    };
+
     try {
-      // Clear existing data (in order to avoid foreign key violations)
-      await supabase.from('playlist_songs').delete().neq('playlistId', 0);
-      await supabase.from('user_favorites').delete().neq('userId', 0);
-      await supabase.from('songs').delete().neq('id', 0);
-      await supabase.from('songbooks').delete().neq('id', 0);
-      await supabase.from('artists').delete().neq('id', 0);
-      await supabase.from('academy').delete().neq('id', 0);
-      await supabase.from('playlists').delete().neq('id', 0);
+      // Clear existing data in dependency order (small batches to avoid timeout)
+      await deleteAllInBatches('playlist_songs', 'songId');
+      await deleteAllInBatches('user_favorites', 'songId');
+      await deleteAllInBatches('songs');
+      await deleteAllInBatches('songbooks');
+      await deleteAllInBatches('artists');
+      await deleteAllInBatches('academy');
+      await deleteAllInBatches('playlists');
 
       const artistMap = new Map();
       if (artists && artists.length > 0) {
-        const artistsToInsert = artists.map((item: any) => {
-          const { id, ...rest } = item;
-          return rest;
-        });
-        const { data, error } = await supabase.from('artists').insert(artistsToInsert).select();
-        if (error) throw new Error(`Artists insert error: ${error.message}`);
-        if (data) {
-          for (let i = 0; i < data.length; i++) {
-            artistMap.set(artists[i].id, data[i].id);
-          }
-        }
+        const toInsert = artists.map(({ id, ...rest }: any) => rest);
+        const inserted = await insertInChunks('artists', toInsert);
+        inserted.forEach((row: any, i: number) => artistMap.set(artists[i].id, row.id));
       }
 
       const songbookMap = new Map();
       if (songbooks && songbooks.length > 0) {
-        const songbooksToInsert = songbooks.map((item: any) => {
-          const { id, ...rest } = item;
-          return rest;
-        });
-        const { data, error } = await supabase.from('songbooks').insert(songbooksToInsert).select();
-        if (error) throw new Error(`Songbooks insert error: ${error.message}`);
-        if (data) {
-          for (let i = 0; i < data.length; i++) {
-            songbookMap.set(songbooks[i].id, data[i].id);
-          }
-        }
+        const toInsert = songbooks.map(({ id, ...rest }: any) => rest);
+        const inserted = await insertInChunks('songbooks', toInsert);
+        inserted.forEach((row: any, i: number) => songbookMap.set(songbooks[i].id, row.id));
       }
 
       const songMap = new Map();
       if (songs && songs.length > 0) {
-        const songsToInsert = songs.map((s: any) => {
+        const toInsert = songs.map((s: any) => {
           const { id, ...rest } = s;
           if (rest.artistId) rest.artistId = artistMap.get(rest.artistId) || null;
           if (rest.songbookId) rest.songbookId = songbookMap.get(rest.songbookId) || null;
           if (rest.artistIds && Array.isArray(rest.artistIds)) {
             rest.artistIds = rest.artistIds.map((aid: number) => artistMap.get(aid)).filter(Boolean);
           }
-          rest.videoUrls = rest.videoUrls ? (typeof rest.videoUrls === 'string' ? JSON.parse(rest.videoUrls) : rest.videoUrls) : [];
+          rest.videoUrls = rest.videoUrls
+            ? (typeof rest.videoUrls === 'string' ? JSON.parse(rest.videoUrls) : rest.videoUrls)
+            : [];
           return rest;
         });
-        
-        const chunkSize = 500;
-        for (let i = 0; i < songsToInsert.length; i += chunkSize) {
-          const chunk = songsToInsert.slice(i, i + chunkSize);
-          const originalChunk = songs.slice(i, i + chunkSize);
-          const { data, error } = await supabase.from('songs').insert(chunk).select();
-          if (error) throw new Error(`Songs insert error: ${error.message}`);
-          if (data) {
-            for (let j = 0; j < data.length; j++) {
-              songMap.set(originalChunk[j].id, data[j].id);
-            }
-          }
-        }
+        const inserted = await insertInChunks('songs', toInsert, 20);
+        inserted.forEach((row: any, i: number) => songMap.set(songs[i].id, row.id));
       }
 
       if (academy && academy.length > 0) {
-        const mappedAcademy = academy.map((a: any) => {
-          const { id, ...rest } = a;
-          return rest;
-        });
-        const { error } = await supabase.from('academy').insert(mappedAcademy);
-        if (error) throw new Error(`Academy insert error: ${error.message}`);
+        const toInsert = academy.map(({ id, ...rest }: any) => rest);
+        await insertInChunks('academy', toInsert);
       }
 
       const playlistMap = new Map();
       if (playlists && playlists.length > 0) {
-        const playlistsToInsert = playlists.map((p: any) => {
-          const { id, ...rest } = p;
-          return rest;
-        });
-        const { data, error } = await supabase.from('playlists').insert(playlistsToInsert).select();
-        if (error) throw new Error(`Playlists insert error: ${error.message}`);
-        if (data) {
-          for (let i = 0; i < data.length; i++) {
-            playlistMap.set(playlists[i].id, data[i].id);
-          }
-        }
+        const toInsert = playlists.map(({ id, ...rest }: any) => rest);
+        const inserted = await insertInChunks('playlists', toInsert);
+        inserted.forEach((row: any, i: number) => playlistMap.set(playlists[i].id, row.id));
       }
 
       if (playlist_songs && playlist_songs.length > 0) {
-        const mappedPS = playlist_songs.map((ps: any) => ({
-          playlistId: playlistMap.get(ps.playlistId),
-          songId: songMap.get(ps.songId),
-          position: ps.position
-        })).filter((ps: any) => ps.playlistId && ps.songId);
-        if (mappedPS.length > 0) {
-          const chunkSize = 1000;
-          for (let i = 0; i < mappedPS.length; i += chunkSize) {
-            const chunk = mappedPS.slice(i, i + chunkSize);
-            const { error } = await supabase.from('playlist_songs').insert(chunk);
-            if (error) throw new Error(`Playlist Songs insert error: ${error.message}`);
-          }
-        }
+        const mapped = playlist_songs
+          .map((ps: any) => ({ playlistId: playlistMap.get(ps.playlistId), songId: songMap.get(ps.songId), position: ps.position }))
+          .filter((ps: any) => ps.playlistId && ps.songId);
+        if (mapped.length > 0) await insertInChunks('playlist_songs', mapped, 100);
       }
 
       if (user_favorites && user_favorites.length > 0) {
-        const mappedFavs = user_favorites.map((uf: any) => ({
-          userId: uf.userId,
-          songId: songMap.get(uf.songId)
-        })).filter((uf: any) => uf.userId && uf.songId);
-        if (mappedFavs.length > 0) {
-          const chunkSize = 1000;
-          for (let i = 0; i < mappedFavs.length; i += chunkSize) {
-            const chunk = mappedFavs.slice(i, i + chunkSize);
-            const { error } = await supabase.from('user_favorites').insert(chunk);
-            if (error) throw new Error(`Favorites insert error: ${error.message}`);
-          }
-        }
+        const mapped = user_favorites
+          .map((uf: any) => ({ userId: uf.userId, songId: songMap.get(uf.songId) }))
+          .filter((uf: any) => uf.userId && uf.songId);
+        if (mapped.length > 0) await insertInChunks('user_favorites', mapped, 100);
       }
 
-      if (user_favorites) {
-        const mappedFavs = user_favorites.map((uf: any) => ({
-          userId: uf.userId,
-          songId: songMap.get(uf.songId)
-        })).filter((uf: any) => uf.userId && uf.songId);
-        if (mappedFavs.length > 0) {
-          await supabase.from('user_favorites').insert(mappedFavs);
-        }
-      }
+
 
       invalidateCache('artists', 'songbooks', 'songs_base', 'academy');
       res.json({ success: true });
