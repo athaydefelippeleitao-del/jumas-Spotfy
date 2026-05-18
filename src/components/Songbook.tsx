@@ -35,7 +35,7 @@ export const Songbook: React.FC = () => {
 
   const [songbooks, setSongbooks] = useState<{id: string, name: string, image?: string, pdfUrl?: string}[]>(() => {
     const cached = loadFromCache<any[]>('songbooks');
-    return cached && cached.length > 0 ? cached : initialSongbooks;
+    return cached && cached.length > 0 ? cached : [];
   });
   const [categories, setCategories] = useState<string[]>(initialCategories);
   const [artists, setArtists] = useState<{id: string, name: string, photoUrl?: string, biography?: string}[]>(() => {
@@ -44,7 +44,7 @@ export const Songbook: React.FC = () => {
   });
   const [songs, setSongs] = useState<any[]>(() => {
     const cached = loadFromCache<any[]>('songs');
-    return cached && cached.length > 0 ? cached : initialSongs;
+    return cached && cached.length > 0 ? cached : [];
   });
   const [playlists, setPlaylists] = useState<any[]>([]);
   const [isLoadingSongbooks, setIsLoadingSongbooks] = useState(false);

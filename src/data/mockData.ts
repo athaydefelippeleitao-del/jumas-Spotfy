@@ -1,8 +1,5 @@
-export const songbooks = [
-  { id: 'jumas', name: 'Cancioneiro JUMAS', image: 'https://picsum.photos/seed/jumas/400/300' },
-  { id: 'jufem', name: 'Cancioneiro JUFEM', image: 'https://picsum.photos/seed/jufem/400/300' },
-  { id: 'missoes', name: 'Missões Familiares', image: 'https://picsum.photos/seed/missoes/400/300' }
-];
+export const songbooks: { id: string; name: string; image?: string; pdfUrl?: string }[] = [];
+
 
 export const categories = [
   "Entrada e Final",
