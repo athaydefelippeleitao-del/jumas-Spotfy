@@ -1113,9 +1113,7 @@ export const Songbook: React.FC = () => {
                   </div>
                   <div className="flex-1 text-left min-w-0">
                     <h3 className="font-bold text-base text-text-primary truncate">{sb.name}</h3>
-                    {!isLoadingSongs && (
-                      <p className="text-xs text-text-secondary mt-0.5">{t('songbook.songCount', { count: songCount })}</p>
-                    )}
+
                   </div>
                 </button>
                 {isAdmin && (
