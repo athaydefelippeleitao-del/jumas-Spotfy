@@ -342,7 +342,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
                             <div className="space-y-1 sm:col-span-3">
                               <label className="text-[10px] font-bold text-text-secondary uppercase px-1">{t('profile.password')} ({t('users.optional')})</label>
                               <input
-                                type="text"
+                                type="password"
                                 placeholder={t('profile.passwordPlaceholder')}
                                 value={editForm.password || ''}
                                 onChange={e => setEditForm({ ...editForm, password: e.target.value })}
