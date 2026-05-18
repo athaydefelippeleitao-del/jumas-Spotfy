@@ -75,7 +75,8 @@
     "deleteUserSuccess": "Cuenta eliminada con éxito.",
     "cannotDeleteSelf": "No puede eliminar su propia cuenta.",
     "footer": "Los administradores pueden crear, editar y eliminar cualquier contenido de la aplicación.",
-    "years": "años"
+    "years": "años",
+    "optional": "Opcional"
   },
   "songbook": {
     "title": "Cancionero",

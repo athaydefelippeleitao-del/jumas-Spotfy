@@ -14,6 +14,7 @@ interface User {
   city?: string;
   age?: number;
   photoUrl?: string;
+  password?: string;
 }
 
 interface UserManagementModalProps {
@@ -197,7 +198,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
 
   const startEditing = (user: User) => {
     setEditingId(user.id);
-    setEditForm(user);
+    setEditForm({ ...user, password: '' });
   };
 
   if (!isOpen) return null;
@@ -337,6 +338,16 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
                                 <option value="user">{t('users.role_user')}</option>
                                 <option value="admin">{t('users.role_admin')}</option>
                               </select>
+                            </div>
+                            <div className="space-y-1 sm:col-span-3">
+                              <label className="text-[10px] font-bold text-text-secondary uppercase px-1">{t('profile.password')} ({t('users.optional')})</label>
+                              <input
+                                type="text"
+                                placeholder={t('profile.passwordPlaceholder')}
+                                value={editForm.password || ''}
+                                onChange={e => setEditForm({ ...editForm, password: e.target.value })}
+                                className="w-full bg-bg-elevated border border-border-color rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-jumas-green/50"
+                              />
                             </div>
                           </div>
                           <div className="space-y-1">

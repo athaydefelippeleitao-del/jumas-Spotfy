@@ -75,7 +75,8 @@
     "deleteUserSuccess": "Conta excluída com sucesso.",
     "cannotDeleteSelf": "Você não pode excluir sua própria conta.",
     "footer": "Administradores podem criar, editar e excluir qualquer conteúdo do aplicativo.",
-    "years": "anos"
+    "years": "anos",
+    "optional": "Opcional"
   },
   "songbook": {
     "title": "Cancioneiro",

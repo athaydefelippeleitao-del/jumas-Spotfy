@@ -248,6 +248,7 @@ async function startServer() {
       if (body.city !== undefined) updates.city = body.city;
       if (body.age !== undefined) updates.age = body.age;
       if (body.photoUrl !== undefined) updates.photoUrl = body.photoUrl;
+      if (body.password !== undefined && body.password !== "") updates.password = bcrypt.hashSync(body.password, 10);
 
       if (updates.role && updates.role !== existingUser.role) {
         console.log(`[ADMIN ACTION] User ${req.user.username} is changing role of user id ${id} from ${existingUser.role} to ${updates.role}`);
