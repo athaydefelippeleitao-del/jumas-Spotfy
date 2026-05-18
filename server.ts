@@ -856,14 +856,17 @@ async function startServer() {
       const { data: songbooks } = await supabase.from('songbooks').select('*');
       const { data: songs } = await supabase.from('songs').select('*');
       const { data: academy } = await supabase.from('academy').select('*');
-      res.json({ artists, songbooks, songs, academy });
+      const { data: playlists } = await supabase.from('playlists').select('*');
+      const { data: playlist_songs } = await supabase.from('playlist_songs').select('*');
+      const { data: user_favorites } = await supabase.from('user_favorites').select('*');
+      res.json({ artists, songbooks, songs, academy, playlists, playlist_songs, user_favorites });
     } catch (error) {
       res.status(500).json({ error: "Erro ao gerar backup" });
     }
   });
 
   app.post("/api/restore", isAdmin, async (req: any, res: any) => {
-    const { artists, songbooks, songs, academy } = req.body;
+    const { artists, songbooks, songs, academy, playlists, playlist_songs, user_favorites } = req.body;
     
     if (!req.body || Object.keys(req.body).length === 0) {
       return res.status(400).json({ error: "O arquivo de backup está vazio ou em formato inválido." });
@@ -877,18 +880,85 @@ async function startServer() {
       await supabase.from('songbooks').delete().neq('id', 0);
       await supabase.from('artists').delete().neq('id', 0);
       await supabase.from('academy').delete().neq('id', 0);
+      await supabase.from('playlists').delete().neq('id', 0);
 
-      if (artists) await supabase.from('artists').insert(artists);
-      if (songbooks) await supabase.from('songbooks').insert(songbooks);
-      if (songs) {
-        const mappedSongs = songs.map((s: any) => ({
-          ...s,
-          videoUrls: s.videoUrls ? (typeof s.videoUrls === 'string' ? JSON.parse(s.videoUrls) : s.videoUrls) : []
-        }));
-        await supabase.from('songs').insert(mappedSongs);
+      const artistMap = new Map();
+      if (artists) {
+        for (const item of artists) {
+          const oldId = item.id;
+          delete item.id;
+          const { data } = await supabase.from('artists').insert(item).select().single();
+          if (data) artistMap.set(oldId, data.id);
+        }
       }
-      if (academy) await supabase.from('academy').insert(academy);
 
+      const songbookMap = new Map();
+      if (songbooks) {
+        for (const item of songbooks) {
+          const oldId = item.id;
+          delete item.id;
+          const { data } = await supabase.from('songbooks').insert(item).select().single();
+          if (data) songbookMap.set(oldId, data.id);
+        }
+      }
+
+      const songMap = new Map();
+      if (songs) {
+        for (const s of songs) {
+          const oldId = s.id;
+          const { id, ...rest } = s;
+          if (rest.artistId) rest.artistId = artistMap.get(rest.artistId) || null;
+          if (rest.songbookId) rest.songbookId = songbookMap.get(rest.songbookId) || null;
+          if (rest.artistIds && Array.isArray(rest.artistIds)) {
+            rest.artistIds = rest.artistIds.map((aid: number) => artistMap.get(aid)).filter(Boolean);
+          }
+          rest.videoUrls = rest.videoUrls ? (typeof rest.videoUrls === 'string' ? JSON.parse(rest.videoUrls) : rest.videoUrls) : [];
+          
+          const { data } = await supabase.from('songs').insert(rest).select().single();
+          if (data) songMap.set(oldId, data.id);
+        }
+      }
+
+      if (academy) {
+        const mappedAcademy = academy.map((a: any) => {
+          const { id, ...rest } = a;
+          return rest;
+        });
+        await supabase.from('academy').insert(mappedAcademy);
+      }
+
+      const playlistMap = new Map();
+      if (playlists) {
+        for (const p of playlists) {
+          const oldId = p.id;
+          const { id, ...rest } = p;
+          const { data } = await supabase.from('playlists').insert(rest).select().single();
+          if (data) playlistMap.set(oldId, data.id);
+        }
+      }
+
+      if (playlist_songs) {
+        const mappedPS = playlist_songs.map((ps: any) => ({
+          playlistId: playlistMap.get(ps.playlistId),
+          songId: songMap.get(ps.songId),
+          position: ps.position
+        })).filter((ps: any) => ps.playlistId && ps.songId);
+        if (mappedPS.length > 0) {
+          await supabase.from('playlist_songs').insert(mappedPS);
+        }
+      }
+
+      if (user_favorites) {
+        const mappedFavs = user_favorites.map((uf: any) => ({
+          userId: uf.userId,
+          songId: songMap.get(uf.songId)
+        })).filter((uf: any) => uf.userId && uf.songId);
+        if (mappedFavs.length > 0) {
+          await supabase.from('user_favorites').insert(mappedFavs);
+        }
+      }
+
+      invalidateCache('artists', 'songbooks', 'songs_base', 'academy');
       res.json({ success: true });
     } catch (error: any) {
       console.error("RESTORE error:", error);
