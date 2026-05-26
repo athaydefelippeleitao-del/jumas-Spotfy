@@ -15,6 +15,7 @@ const getAiInstance = () => {
     if (!apiKey) {
       throw new Error('Chave da API Gemini não encontrada. Certifique-se de que a variável GEMINI_API_KEY está configurada.');
     }
+    // @ts-ignore
     aiInstance = new GoogleGenAI(apiKey);
   }
   return aiInstance;
@@ -23,6 +24,7 @@ const getAiInstance = () => {
 export const extractSongsFromText = async (text: string): Promise<ExtractedSong[]> => {
   try {
     const genAI = getAiInstance();
+    // @ts-ignore
     const model = genAI.getGenerativeModel({
       model: "gemini-2.0-flash",
       generationConfig: {
