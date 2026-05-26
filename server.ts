@@ -146,6 +146,43 @@ async function startServer() {
     }
   });
 
+  app.post("/api/auth/reset-password", async (req, res) => {
+    const { username, email, password } = req.body;
+    
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: "Usuário, e-mail e nova senha são obrigatórios" });
+    }
+
+    try {
+      const { data: user, error } = await supabase
+        .from('users')
+        .select('id')
+        .eq('username', username)
+        .eq('email', email)
+        .single();
+
+      if (error || !user) {
+        return res.status(400).json({ error: "Nome de usuário ou e-mail incorretos" });
+      }
+
+      const hashedPassword = bcrypt.hashSync(password, 10);
+      
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ password: hashedPassword })
+        .eq('id', user.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      res.json({ success: true, message: "Senha redefinida com sucesso" });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ error: "Erro ao redefinir a senha" });
+    }
+  });
+
   app.post("/api/auth/logout", (req, res) => {
     res.clearCookie("token");
     res.json({ success: true });

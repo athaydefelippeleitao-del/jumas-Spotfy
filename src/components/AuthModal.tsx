@@ -14,7 +14,7 @@ interface AuthModalProps {
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, isFullScreen }) => {
   const { t, i18n } = useTranslation();
-  const [isLogin, setIsLogin] = useState(true);
+  const [authMode, setAuthMode] = useState<'login' | 'register' | 'recover'>('login');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -53,8 +53,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, isFullScr
     setLoading(true);
 
     try {
-      const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-      const body = isLogin ? { username, password } : { username, email, password, name, adminCode };
+      if (authMode === 'recover') {
+        const res = await fetch('/api/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, email, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erro ao redefinir a senha');
+        
+        setError('Senha redefinida com sucesso! Faça login.');
+        setAuthMode('login');
+        setLoading(false);
+        return;
+      }
+
+      const endpoint = authMode === 'login' ? '/api/auth/login' : '/api/auth/register';
+      const body = authMode === 'login' ? { username, password } : { username, email, password, name, adminCode };
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -142,10 +157,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, isFullScr
                 </button>
               </div>
 
-              {!isLogin && (
+              {authMode !== 'login' && (
                 <button 
                   type="button"
-                  onClick={() => setIsLogin(true)}
+                  onClick={() => setAuthMode('login')}
                   className="absolute top-8 left-8 p-2 text-text-secondary hover:text-jumas-green transition-colors bg-white/5 rounded-full"
                   title="Voltar para o login"
                 >
@@ -181,10 +196,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, isFullScr
 
               <div className="text-center">
                 <h2 className="text-2xl font-black text-text-primary tracking-tight">
-                  {isLogin ? t('auth.welcomeBack', { defaultValue: 'Bem-vindo de volta' }) : t('auth.createAccount', { defaultValue: 'Crie sua conta' })}
+                  {authMode === 'login' ? t('auth.welcomeBack', { defaultValue: 'Bem-vindo de volta' }) 
+                   : authMode === 'recover' ? 'Recuperar Senha' 
+                   : t('auth.createAccount', { defaultValue: 'Crie sua conta' })}
                 </h2>
                 <p className="text-sm text-text-secondary mt-1">
-                  {isLogin ? t('auth.loginSubtitle', { defaultValue: 'Entre para acessar o Cancioneiro' }) : t('auth.registerSubtitle', { defaultValue: 'Faça parte da nossa comunidade' })}
+                  {authMode === 'login' ? t('auth.loginSubtitle', { defaultValue: 'Entre para acessar o Cancioneiro' }) 
+                   : authMode === 'recover' ? 'Insira seus dados para criar uma nova senha' 
+                   : t('auth.registerSubtitle', { defaultValue: 'Faça parte da nossa comunidade' })}
                 </p>
               </div>
             </div>
@@ -200,42 +219,42 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, isFullScr
                 </motion.div>
               )}
 
-              {!isLogin && (
-                <>
-                  <div>
-                    <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-1.5 ml-1">{t('profile.name')}</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-text-secondary">
-                        <User size={18} />
-                      </div>
-                      <input 
-                        type="text" 
-                        value={name} 
-                        onChange={e => setName(e.target.value)} 
-                        className="w-full bg-bg-secondary/50 border border-white/5 text-text-primary rounded-2xl pl-11 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-jumas-green/50 focus:border-jumas-green transition-all" 
-                        placeholder={t('profile.name')} 
-                        required={!isLogin}
-                      />
+              {authMode === 'register' && (
+                <div>
+                  <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-1.5 ml-1">{t('profile.name')}</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-text-secondary">
+                      <User size={18} />
                     </div>
+                    <input 
+                      type="text" 
+                      value={name} 
+                      onChange={e => setName(e.target.value)} 
+                      className="w-full bg-bg-secondary/50 border border-white/5 text-text-primary rounded-2xl pl-11 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-jumas-green/50 focus:border-jumas-green transition-all" 
+                      placeholder={t('profile.name')} 
+                      required={authMode === 'register'}
+                    />
                   </div>
+                </div>
+              )}
 
-                  <div>
-                    <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-1.5 ml-1">{t('profile.email')}</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-text-secondary">
-                        <Mail size={18} />
-                      </div>
-                      <input 
-                        type="email" 
-                        value={email} 
-                        onChange={e => setEmail(e.target.value)} 
-                        className="w-full bg-bg-secondary/50 border border-white/5 text-text-primary rounded-2xl pl-11 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-jumas-green/50 focus:border-jumas-green transition-all" 
-                        placeholder="seu@email.com" 
-                        required={!isLogin}
-                      />
+              {(authMode === 'register' || authMode === 'recover') && (
+                <div>
+                  <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-1.5 ml-1">{t('profile.email')}</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-text-secondary">
+                      <Mail size={18} />
                     </div>
+                    <input 
+                      type="email" 
+                      value={email} 
+                      onChange={e => setEmail(e.target.value)} 
+                      className="w-full bg-bg-secondary/50 border border-white/5 text-text-primary rounded-2xl pl-11 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-jumas-green/50 focus:border-jumas-green transition-all" 
+                      placeholder="seu@email.com" 
+                      required={authMode === 'register' || authMode === 'recover'}
+                    />
                   </div>
-                </>
+                </div>
               )}
 
               <div>
@@ -256,7 +275,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, isFullScr
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-1.5 ml-1">{t('profile.password')}</label>
+                <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-1.5 ml-1">
+                  {authMode === 'recover' ? 'Nova Senha' : t('profile.password')}
+                </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-text-secondary">
                     <Lock size={18} />
@@ -273,7 +294,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, isFullScr
                 </div>
               </div>
 
-              {!isLogin && (
+              {authMode === 'register' && (
                 <div className="mt-2">
                   <button
                     type="button"
@@ -314,20 +335,35 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, isFullScr
                     {t('common.wait', { defaultValue: 'Aguarde...' })}
                   </>
                 ) : (
-                  isLogin ? t('auth.login') : t('auth.register')
+                  authMode === 'login' ? t('auth.login') 
+                  : authMode === 'recover' ? 'Redefinir Senha' 
+                  : t('auth.register')
                 )}
               </button>
 
-              <div className="mt-6 text-center">
+              <div className="mt-6 text-center flex flex-col gap-4">
+                {authMode === 'login' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode('recover');
+                      setError('');
+                    }}
+                    className="text-[10px] text-text-secondary hover:text-jumas-green transition-colors font-bold uppercase tracking-widest"
+                  >
+                    Esqueceu a senha?
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => {
-                    setIsLogin(!isLogin);
+                    setAuthMode(authMode === 'login' ? 'register' : 'login');
                     setError('');
                   }}
                   className="text-xs text-text-secondary hover:text-jumas-green transition-colors font-bold uppercase tracking-widest"
                 >
-                  {isLogin ? t('auth.noAccount', { defaultValue: 'Não tem uma conta? Cadastre-se' }) : t('auth.hasAccount', { defaultValue: 'Já tem uma conta? Entre' })}
+                  {authMode === 'login' ? t('auth.noAccount', { defaultValue: 'Não tem uma conta? Cadastre-se' }) 
+                   : t('auth.hasAccount', { defaultValue: 'Já tem uma conta? Entre' })}
                 </button>
               </div>
             </form>
