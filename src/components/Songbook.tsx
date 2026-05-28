@@ -535,7 +535,7 @@ export const Songbook: React.FC = () => {
     
     if (searchQuery) return matchesSearch && matchesSongbook;
     return matchesSongbook && matchesCategory;
-  });
+  }).sort((a, b) => a.number - b.number);
 
   const filteredArtists = isGlobalSearchActive && searchQuery
     ? artists.filter(a => a.name.toLowerCase().includes(searchQuery.toLowerCase()))
