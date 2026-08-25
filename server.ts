@@ -8,7 +8,9 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = typeof __dirname !== "undefined" 
+  ? __dirname 
+  : path.dirname(fileURLToPath(import.meta.url || "file://"));
 
 dotenv.config();
 
@@ -17,7 +19,14 @@ const JWT_SECRET = process.env.JWT_SECRET || "super-secret-key-for-dev";
 // Supabase Client Initialization
 const supabaseUrl = process.env.SUPABASE_URL || "";
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error("ERRO CRITICO: SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY não configurados nas variáveis de ambiente!");
+}
+
+const supabase = supabaseUrl && supabaseServiceKey 
+  ? createClient(supabaseUrl, supabaseServiceKey) 
+  : ({} as any); // Previne crash imediato para a página poder retornar um erro mais legível
 
 // ─── Cache em memória (server-side) ──────────────────────────────────────────
 // Guarda as respostas das APIs principais para evitar round-trips ao Supabase
