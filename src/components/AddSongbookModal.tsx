@@ -5,7 +5,6 @@ import { extractTextFromPdf } from '../services/pdfService';
 import { extractSongsFromText, ExtractedSong } from '../services/geminiService';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
-import { supabase } from '../lib/supabase';
 
 interface AddSongbookModalProps {
   isOpen: boolean;
@@ -18,6 +17,7 @@ export const AddSongbookModal: React.FC<AddSongbookModalProps> = ({ isOpen, onCl
   const { t } = useTranslation();
   const [name, setName] = useState('');
   const [image, setImage] = useState<string | undefined>(undefined);
+  const [imageFile, setImageFile] = useState<File | undefined>(undefined);
   const [pdfUrl, setPdfUrl] = useState<string | undefined>(undefined);
   const [pdfFile, setPdfFile] = useState<File | undefined>(undefined);
   const [pdfName, setPdfName] = useState<string | undefined>(undefined);
@@ -33,13 +33,17 @@ export const AddSongbookModal: React.FC<AddSongbookModalProps> = ({ isOpen, onCl
     if (editData) {
       setName(editData.name);
       setImage(editData.image);
+      setImageFile(undefined);
       setPdfUrl(editData.pdfUrl);
+      setPdfFile(undefined);
       setPdfName(editData.pdfUrl ? 'Arquivo PDF anexado' : undefined);
       setExtractedSongs([]);
     } else {
       setName('');
       setImage(undefined);
+      setImageFile(undefined);
       setPdfUrl(undefined);
+      setPdfFile(undefined);
       setPdfName(undefined);
       setExtractedSongs([]);
     }
@@ -49,6 +53,7 @@ export const AddSongbookModal: React.FC<AddSongbookModalProps> = ({ isOpen, onCl
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setImage(reader.result as string);
@@ -64,6 +69,7 @@ export const AddSongbookModal: React.FC<AddSongbookModalProps> = ({ isOpen, onCl
         alert(t('profile.error'));
         return;
       }
+      setPdfFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setPdfUrl(reader.result as string);
@@ -82,7 +88,6 @@ export const AddSongbookModal: React.FC<AddSongbookModalProps> = ({ isOpen, onCl
       const text = await extractTextFromPdf(pdfUrl);
       const songs = await extractSongsFromText(text);
       setExtractedSongs(songs);
-      // alert(`${songs.length} músicas identificadas com sucesso!`);
     } catch (error: any) {
       alert(error.message || t('profile.error'));
     } finally {
@@ -96,16 +101,65 @@ export const AddSongbookModal: React.FC<AddSongbookModalProps> = ({ isOpen, onCl
     
     setIsSubmitting(true);
     try {
+      let finalPdfUrl = pdfUrl;
+      let finalImageUrl = image;
+      
+      if (pdfFile) {
+        const fileExt = pdfFile.name.split('.').pop();
+        const fileName = \`\${Date.now()}-\${Math.random().toString(36).substring(2, 15)}.\${fileExt}\`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('pdfs')
+          .upload(fileName, pdfFile);
+          
+        if (uploadError) {
+          console.error('Upload PDF error:', uploadError);
+          alert('Erro ao enviar o PDF. Verifique se o bucket "pdfs" existe e é público no Supabase.');
+          setIsSubmitting(false);
+          return;
+        }
+        
+        const { data } = supabase.storage
+          .from('pdfs')
+          .getPublicUrl(fileName);
+          
+        finalPdfUrl = data.publicUrl;
+      }
+      
+      if (imageFile) {
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = \`\${Date.now()}-\${Math.random().toString(36).substring(2, 15)}.\${fileExt}\`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('images')
+          .upload(fileName, imageFile);
+          
+        if (uploadError) {
+          console.error('Upload Image error:', uploadError);
+          alert('Erro ao enviar a imagem. Verifique se o bucket "images" existe e é público no Supabase.');
+          setIsSubmitting(false);
+          return;
+        }
+        
+        const { data } = supabase.storage
+          .from('images')
+          .getPublicUrl(fileName);
+          
+        finalImageUrl = data.publicUrl;
+      }
+
       await onAdd({
         id: editData ? editData.id : Date.now().toString(),
         name: name.trim(),
-        image: image,
-        pdfUrl: pdfUrl
+        image: finalImageUrl,
+        pdfUrl: finalPdfUrl
       }, extractedSongs);
       
       setName('');
       setImage(undefined);
+      setImageFile(undefined);
       setPdfUrl(undefined);
+      setPdfFile(undefined);
       setPdfName(undefined);
       setExtractedSongs([]);
       onClose();
@@ -174,7 +228,10 @@ export const AddSongbookModal: React.FC<AddSongbookModalProps> = ({ isOpen, onCl
                 {image && (
                   <button 
                     type="button" 
-                    onClick={() => setImage(undefined)}
+                    onClick={() => {
+                      setImage(undefined);
+                      setImageFile(undefined);
+                    }}
                     className="text-xs font-bold text-red-500 hover:text-red-600 transition-colors"
                   >
                     {t('songbook.removePhoto')}
@@ -199,13 +256,13 @@ export const AddSongbookModal: React.FC<AddSongbookModalProps> = ({ isOpen, onCl
                 <label className="block text-sm font-medium text-text-secondary mb-1.5">{t('songbook.attachPdf')}</label>
                 <div 
                   onClick={() => pdfInputRef.current?.click()}
-                  className={`w-full p-4 bg-bg-secondary border-2 border-dashed rounded-xl cursor-pointer transition-all flex items-center gap-3 ${pdfUrl ? 'border-jumas-green bg-jumas-green/5' : 'border-border-color hover:border-jumas-green'}`}
+                  className={\`w-full p-4 bg-bg-secondary border-2 border-dashed rounded-xl cursor-pointer transition-all flex items-center gap-3 \${pdfUrl ? 'border-jumas-green bg-jumas-green/5' : 'border-border-color hover:border-jumas-green'}\`}
                 >
-                  <div className={`p-2 rounded-lg ${pdfUrl ? 'bg-jumas-green text-white' : 'bg-bg-elevated text-text-secondary'}`}>
+                  <div className={\`p-2 rounded-lg \${pdfUrl ? 'bg-jumas-green text-white' : 'bg-bg-elevated text-text-secondary'}\`}>
                     <FileText size={20} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-bold truncate ${pdfUrl ? 'text-jumas-green' : 'text-text-primary'}`}>
+                    <p className={\`text-sm font-bold truncate \${pdfUrl ? 'text-jumas-green' : 'text-text-primary'}\`}>
                       {pdfName || t('songbook.selectPdf')}
                     </p>
                     <p className="text-[10px] text-text-secondary uppercase tracking-widest font-medium">
@@ -218,6 +275,7 @@ export const AddSongbookModal: React.FC<AddSongbookModalProps> = ({ isOpen, onCl
                       onClick={(e) => {
                         e.stopPropagation();
                         setPdfUrl(undefined);
+                        setPdfFile(undefined);
                         setPdfName(undefined);
                         setExtractedSongs([]);
                       }}
@@ -300,4 +358,3 @@ export const AddSongbookModal: React.FC<AddSongbookModalProps> = ({ isOpen, onCl
     </AnimatePresence>
   );
 };
-
