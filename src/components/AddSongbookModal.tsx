@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { extractTextFromPdf } from '../services/pdfService';
 import { extractSongsFromText, ExtractedSong } from '../services/geminiService';
 import { useTranslation } from 'react-i18next';
+import { supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 
 interface AddSongbookModalProps {
   isOpen: boolean;
@@ -17,6 +19,7 @@ export const AddSongbookModal: React.FC<AddSongbookModalProps> = ({ isOpen, onCl
   const [name, setName] = useState('');
   const [image, setImage] = useState<string | undefined>(undefined);
   const [pdfUrl, setPdfUrl] = useState<string | undefined>(undefined);
+  const [pdfFile, setPdfFile] = useState<File | undefined>(undefined);
   const [pdfName, setPdfName] = useState<string | undefined>(undefined);
   const [isProcessing, setIsProcessing] = useState(false);
   const [extractedSongs, setExtractedSongs] = useState<ExtractedSong[]>([]);
@@ -297,3 +300,4 @@ export const AddSongbookModal: React.FC<AddSongbookModalProps> = ({ isOpen, onCl
     </AnimatePresence>
   );
 };
+
