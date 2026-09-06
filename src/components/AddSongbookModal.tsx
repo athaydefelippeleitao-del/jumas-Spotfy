@@ -124,6 +124,19 @@ export const AddSongbookModal: React.FC<AddSongbookModalProps> = ({ isOpen, onCl
           .getPublicUrl(fileName);
           
         finalPdfUrl = data.publicUrl;
+      } else if (finalPdfUrl && finalPdfUrl.startsWith('data:')) {
+        try {
+          const res = await fetch(finalPdfUrl);
+          const blob = await res.blob();
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.pdf`;
+          const { error: uploadError } = await supabase.storage.from('pdfs').upload(fileName, blob);
+          if (!uploadError) {
+            const { data } = supabase.storage.from('pdfs').getPublicUrl(fileName);
+            finalPdfUrl = data.publicUrl;
+          }
+        } catch (e) {
+          console.error('Migration upload PDF error:', e);
+        }
       }
       
       if (imageFile) {
@@ -146,6 +159,19 @@ export const AddSongbookModal: React.FC<AddSongbookModalProps> = ({ isOpen, onCl
           .getPublicUrl(fileName);
           
         finalImageUrl = data.publicUrl;
+      } else if (finalImageUrl && finalImageUrl.startsWith('data:')) {
+        try {
+          const res = await fetch(finalImageUrl);
+          const blob = await res.blob();
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.jpg`;
+          const { error: uploadError } = await supabase.storage.from('images').upload(fileName, blob);
+          if (!uploadError) {
+            const { data } = supabase.storage.from('images').getPublicUrl(fileName);
+            finalImageUrl = data.publicUrl;
+          }
+        } catch (e) {
+          console.error('Migration upload image error:', e);
+        }
       }
 
       await onAdd({
