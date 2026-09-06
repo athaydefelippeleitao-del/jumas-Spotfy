@@ -106,7 +106,7 @@ export const AddSongbookModal: React.FC<AddSongbookModalProps> = ({ isOpen, onCl
       
       if (pdfFile) {
         const fileExt = pdfFile.name.split('.').pop();
-        const fileName = \`\${Date.now()}-\${Math.random().toString(36).substring(2, 15)}.\${fileExt}\`;
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
         
         const { error: uploadError } = await supabase.storage
           .from('pdfs')
@@ -128,7 +128,7 @@ export const AddSongbookModal: React.FC<AddSongbookModalProps> = ({ isOpen, onCl
       
       if (imageFile) {
         const fileExt = imageFile.name.split('.').pop();
-        const fileName = \`\${Date.now()}-\${Math.random().toString(36).substring(2, 15)}.\${fileExt}\`;
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
         
         const { error: uploadError } = await supabase.storage
           .from('images')
@@ -256,13 +256,13 @@ export const AddSongbookModal: React.FC<AddSongbookModalProps> = ({ isOpen, onCl
                 <label className="block text-sm font-medium text-text-secondary mb-1.5">{t('songbook.attachPdf')}</label>
                 <div 
                   onClick={() => pdfInputRef.current?.click()}
-                  className={\`w-full p-4 bg-bg-secondary border-2 border-dashed rounded-xl cursor-pointer transition-all flex items-center gap-3 \${pdfUrl ? 'border-jumas-green bg-jumas-green/5' : 'border-border-color hover:border-jumas-green'}\`}
+                  className={`w-full p-4 bg-bg-secondary border-2 border-dashed rounded-xl cursor-pointer transition-all flex items-center gap-3 ${pdfUrl ? 'border-jumas-green bg-jumas-green/5' : 'border-border-color hover:border-jumas-green'}`}
                 >
-                  <div className={\`p-2 rounded-lg \${pdfUrl ? 'bg-jumas-green text-white' : 'bg-bg-elevated text-text-secondary'}\`}>
+                  <div className={`p-2 rounded-lg ${pdfUrl ? 'bg-jumas-green text-white' : 'bg-bg-elevated text-text-secondary'}`}>
                     <FileText size={20} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className={\`text-sm font-bold truncate \${pdfUrl ? 'text-jumas-green' : 'text-text-primary'}\`}>
+                    <p className={`text-sm font-bold truncate ${pdfUrl ? 'text-jumas-green' : 'text-text-primary'}`}>
                       {pdfName || t('songbook.selectPdf')}
                     </p>
                     <p className="text-[10px] text-text-secondary uppercase tracking-widest font-medium">
