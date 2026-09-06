@@ -375,7 +375,7 @@ export const Songbook: React.FC = () => {
           }
           alert('Cancioneiro criado com sucesso!');
         } else {
-          const text = await res.text(); try { const data = JSON.parse(text); alert(data.error || \'Erro ao criar cancioneiro\'); } catch(e) { alert(\'Vercel Error HTML: \' + text.substring(0, 100)); }
+          const text = await res.text(); try { const data = JSON.parse(text); alert(data.error || 'Erro ao criar cancioneiro'); } catch(e) { alert('Vercel Error HTML: ' + text.substring(0, 100)); }
         }
       }
     } catch (error) {
