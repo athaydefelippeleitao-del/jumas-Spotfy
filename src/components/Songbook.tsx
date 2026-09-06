@@ -375,13 +375,12 @@ export const Songbook: React.FC = () => {
           }
           alert('Cancioneiro criado com sucesso!');
         } else {
-          const data = await res.json();
-          alert(data.error || 'Erro ao criar cancioneiro');
+          const text = await res.text(); try { const data = JSON.parse(text); alert(data.error || \'Erro ao criar cancioneiro\'); } catch(e) { alert(\'Vercel Error HTML: \' + text.substring(0, 100)); }
         }
       }
     } catch (error) {
       console.error('Failed to handle songbook', error);
-      alert('Erro de conexão ao salvar cancioneiro');
+      alert('Erro de conexão: ' + (error.message || JSON.stringify(error)));
     }
     
     setSongbookToEdit(null);
